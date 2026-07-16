@@ -31,11 +31,11 @@ export function cleanText(text) {
   // Supprimer les balises HTML
   let cleaned = text.replace(/<[^>]*>/g, ' ');
   
+  // Supprimer les caractères de contrôle (sauf nouvelle ligne et tabulation)
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  
   // Supprimer les espaces multiples
   cleaned = cleaned.replace(/\s+/g, ' ');
-  
-  // Supprimer les caractères de contrôle
-  cleaned = cleaned.replace(/[\x00-\x1F\x7F]/g, '');
   
   // Trim
   return cleaned.trim();
@@ -54,7 +54,7 @@ export function isEmailTooLarge(emailContent, maxSize) {
 }
 
 /**
- * Extrait le corps du texte d'un email (supprime les citations et signatures)
+ * Extrait le corps principal d'un email (supprime les citations et signatures)
  * @param {string} body - Le corps de l'email
  * @returns {string} Le corps nettoyé
  */
@@ -63,15 +63,19 @@ export function extractMainBody(body) {
   
   let cleaned = cleanText(body);
   
-  // Supprimer les citations (ex: "Le 12/01/2024, John Doe a écrit :")
+  // Supprimer toutes les lignes qui commencent par > (citations)
+  cleaned = cleaned.replace(/^\s*>.*$/gm, '');
+  
+  // Supprimer les signatures (-- suivi de texte jusqu'à la fin)
+  cleaned = cleaned.replace(/\s*--\s*[\s\S]*$/i, '');
+  
+  // Supprimer les lignes de réponse (ex: "Le 12/01/2024, John Doe a écrit :")
   cleaned = cleaned.replace(/Le \d{2}\/\d{2}\/\d{4}, .* a écrit :/gi, '');
   cleaned = cleaned.replace(/On \w+, \w+ \d+, \d+ at \d+:\d+ [AP]M, .* wrote:/gi, '');
   
-  // Supprimer les signatures (ex: "--\nJohn Doe")
-  cleaned = cleaned.replace(/--\s*\n.*$/s, '');
-  
-  // Supprimer les lignes de réponse (ex: "> Le 12/01/2024...")
-  cleaned = cleaned.replace(/^>.*$/gm, '');
+  // Supprimer les lignes qui contiennent "wrote:" ou "a écrit :" (citations)
+  cleaned = cleaned.replace(/^\s*.*[wW]rote:.*$/gm, '');
+  cleaned = cleaned.replace(/^\s*.*a écrit :.*$/gm, '');
   
   // Supprimer les espaces multiples
   cleaned = cleaned.replace(/\s+/g, ' ');

@@ -144,6 +144,12 @@ export function isValidQuery(query) {
     return false;
   }
 
+  // Vérifier la longueur avant normalisation (pour éviter les problèmes avec les stop words)
+  const cleaned = cleanText(query);
+  if (cleaned.length < 2) {
+    return false;
+  }
+
   const normalized = normalizeQuery(query);
   return normalized.length >= 2; // Au moins 2 caractères
 }

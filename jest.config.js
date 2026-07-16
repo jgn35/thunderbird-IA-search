@@ -1,7 +1,6 @@
-/** @type {import('ts-jest').JestConfigWithTsJest} */
+/** @type {import('@jest/types').Config.InitialOptions} */
 module.exports = {
-  preset: 'jest-environment-node',
-  testEnvironment: 'node',
+  testEnvironment: 'jest-environment-node',
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.js'],
   moduleFileExtensions: ['js', 'json', 'node'],
@@ -12,5 +11,10 @@ module.exports = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
   verbose: true,
-  transform: {},
+  transform: {
+    '^.+\\.js$': 'babel-jest',
+  },
+  moduleNameMapper: {
+    '^(\.{1,2}/.*)\.js$': '$1',
+  },
 };
