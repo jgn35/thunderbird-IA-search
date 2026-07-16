@@ -1,0 +1,46 @@
+{
+  "manifest_version": 2,
+  "name": "Thunderbird RAG Search",
+  "version": "1.0.0",
+  "description": "Indexation et recherche RAG pour Thunderbird avec ChromaDB et LLM (Mistral/Ollama)",
+  "applications": {
+    "gecko": {
+      "id": "rag-search@thunderbird",
+      "strict_min_version": "102.0"
+    }
+  },
+  "permissions": [
+    "accountsRead",
+    "messagesRead",
+    "messagesModify",
+    "storage",
+    "notifications",
+    "downloads"
+  ],
+  "sidebar_action": {
+    "default_panel": "src/modules/ui/sidebar.html",
+    "default_title": "RAG Search",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "64": "icons/icon-64.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "64": "icons/icon-64.png"
+  },
+  "background": {
+    "scripts": ["src/background.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.thunderbird.net/*"],
+      "js": ["src/content.js"]
+    }
+  ]
+}

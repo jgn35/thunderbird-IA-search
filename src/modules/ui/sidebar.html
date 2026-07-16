@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG Search</title>
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+  <div class="sidebar-container">
+    <!-- En-tête -->
+    <div class="sidebar-header">
+      <h1>RAG Search</h1>
+      <p class="subtitle">Recherche intelligente dans vos emails</p>
+    </div>
+
+    <!-- Onglets -->
+    <div class="tabs">
+      <button class="tab-button active" data-tab="search">Recherche</button>
+      <button class="tab-button" data-tab="config">Configuration</button>
+      <button class="tab-button" data-tab="logs">Logs</button>
+    </div>
+
+    <!-- Contenu des onglets -->
+    <div class="tab-content">
+      <!-- Onglet Recherche -->
+      <div id="search" class="tab-pane active">
+        <div class="search-section">
+          <div class="search-box">
+            <input 
+              type="text" 
+              id="searchInput" 
+              placeholder="Posez votre question..."
+              autocomplete="off"
+            >
+            <button id="searchButton">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="search-options">
+            <label>
+              <input type="checkbox" id="useRAGCheckbox"> Utiliser RAG
+            </label>
+            <select id="llmTypeSelect">
+              <option value="api_externe">API Externe (Mistral)</option>
+              <option value="local">Local (Ollama)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="indexation-status">
+          <div class="status-item">
+            <span class="status-label">Emails indexés:</span>
+            <span id="indexedCount">0</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Dernière indexation:</span>
+            <span id="lastIndexation">Jamais</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Indexation en cours:</span>
+            <span id="isIndexing">Non</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="indexAllButton" class="btn btn-primary">
+            Indexer tous les emails
+          </button>
+          <button id="indexModifiedButton" class="btn btn-secondary">
+            Indexer les modifiés
+          </button>
+          <button id="clearIndexButton" class="btn btn-danger">
+            Vider l'index
+          </button>
+        </div>
+
+        <div class="results-section">
+          <h3>Résultats</h3>
+          <div id="resultsContainer">
+            <p class="no-results">Aucun résultat pour le moment.</p>
+          </div>
+        </div>
+
+        <div class="rag-answer-section" id="ragAnswerSection" style="display: none;">
+          <h3>Réponse RAG</h3>
+          <div id="ragAnswer">
+            <!-- La réponse sera affichée ici -->
+          </div>
+          <div class="answer-meta">
+            <span id="answerModel"></span>
+            <span id="answerDuration"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Onglet Configuration -->
+      <div id="config" class="tab-pane">
+        <div class="config-section">
+          <h3>Indexation</h3>
+          
+          <div class="config-group">
+            <label for="excludedFolders">Dossiers exclus:</label>
+            <input 
+              type="text" 
+              id="excludedFolders" 
+              placeholder="Spam, Trash, ..."
+            >
+            <small>Séparés par des virgules</small>
+          </div>
+
+          <div class="config-group">
+            <label>
+              <input type="checkbox" id="indexAttachments"> 
+              Indexer les pièces jointes
+            </label>
+          </div>
+
+          <div class="config-group">
+            <label for="maxEmailSize">Taille max des emails (Mo):</label>
+            <input 
+              type="number" 
+              id="maxEmailSize" 
+              min="1" 
+              max="100" 
+              value="10"
+            >
+          </div>
+
+          <div class="config-group">
+            <label for="selectedFolders">Dossiers à indexer:</label>
+            <select id="selectedFolders" multiple size="5">
+              <!-- Les dossiers seront chargés dynamiquement -->
+            </select>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <h3>RAG - Configuration LLM</h3>
+          
+          <div class="llm-config">
+            <div class="config-group">
+              <label>Type de LLM:</label>
+              <select id="configLLMType">
+                <option value="api_externe">API Externe (Mistral AI)</option>
+                <option value="local">Local (Ollama)</option>
+              </select>
+            </div>
+
+            <!-- Configuration API Externe -->
+            <div id="apiConfigSection" class="llm-config-section">
+              <h4>API Externe (Mistral AI)</h4>
+              
+              <div class="config-group">
+                <label for="apiEndpoint">Endpoint:</label>
+                <input 
+                  type="text" 
+                  id="apiEndpoint" 
+                  placeholder="https://api.mistral.ai/v1"
+                >
+              </div>
+
+              <div class="config-group">
+                <label for="apiKey">Clé API:</label>
+                <input 
+                  type="password" 
+                  id="apiKey" 
+                  placeholder="Votre clé API"
+                >
+              </div>
+
+              <div class="config-group">
+                <label for="apiModel">Modèle:</label>
+                <select id="apiModel">
+                  <option value="mistral-tiny">mistral-tiny</option>
+                  <option value="mistral-small">mistral-small</option>
+                  <option value="mistral-medium">mistral-medium</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Configuration Ollama -->
+            <div id="ollamaConfigSection" class="llm-config-section" style="display: none;">
+              <h4>Local (Ollama)</h4>
+              
+              <div class="config-group">
+                <label for="ollamaUrl">URL du serveur:</label>
+                <input 
+                  type="text" 
+                  id="ollamaUrl" 
+                  placeholder="http://localhost:11434"
+                >
+              </div>
+
+              <div class="config-group">
+                <label for="ollamaModel">Modèle:</label>
+                <input 
+                  type="text" 
+                  id="ollamaModel" 
+                  placeholder="mistral-7b"
+                >
+              </div>
+
+              <div class="config-group">
+                <button id="checkOllamaStatus" class="btn btn-small">
+                  Vérifier le statut
+                </button>
+                <span id="ollamaStatus"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-actions">
+            <button id="saveConfigButton" class="btn btn-primary">
+              Sauvegarder la configuration
+            </button>
+            <button id="resetConfigButton" class="btn btn-secondary">
+              Réinitialiser
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Onglet Logs -->
+      <div id="logs" class="tab-pane">
+        <div class="logs-section">
+          <div class="logs-actions">
+            <button id="refreshLogsButton" class="btn btn-small">
+              Rafraîchir
+            </button>
+            <button id="clearLogsButton" class="btn btn-small btn-danger">
+              Effacer les logs
+            </button>
+            <button id="exportLogsButton" class="btn btn-small">
+              Exporter
+            </button>
+          </div>
+          
+          <div class="logs-container">
+            <pre id="logsContent">Chargement des logs...</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Indicateur de chargement -->
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+      <div class="spinner"></div>
+      <span id="loadingText">Chargement...</span>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notificationContainer" class="notification-container"></div>
+  </div>
+
+  <script src="sidebar.js" type="module"></script>
+</body>
+</html>
