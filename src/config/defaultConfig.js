@@ -18,6 +18,7 @@
  * @property {Object} api - Configuration pour l'API externe (Mistral AI)
  * @property {string} api.endpoint - Endpoint de l'API
  * @property {string} api.apiKey - Clé API pour l'authentification
+ * @property {string} [api.embeddingEndpoint] - Endpoint pour les embeddings (optionnel)
  * @property {Object} local - Configuration pour le LLM local (Ollama)
  * @property {string} local.url - URL du serveur Ollama
  * @property {string} local.model - Nom du modèle à utiliser
@@ -28,6 +29,8 @@
  * @typedef {Object} DefaultConfig
  * @property {IndexationConfig} indexation - Configuration de l'indexation
  * @property {RAGConfig} rag - Configuration du RAG
+ * @property {string[]} [selectedFolders] - Dossiers sélectionnés pour l'indexation
+ * @property {string} [lastIndexation] - Date de la dernière indexation
  */
 
 /**
@@ -45,12 +48,15 @@ export const DEFAULT_CONFIG = {
     api: {
       endpoint: "https://api.mistral.ai/v1",
       apiKey: "",
+      embeddingEndpoint: "https://api.mistral.ai/v1/embeddings", // Endpoint pour les embeddings
     },
     local: {
       url: "http://localhost:11434",
       model: "mistral-7b",
     },
   },
+  selectedFolders: [],
+  lastIndexation: null,
 };
 
 /**

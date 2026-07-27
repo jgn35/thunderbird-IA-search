@@ -8,6 +8,7 @@ import { callMistralAPI, generateResponseWithContext as generateWithMistral } fr
 import { callOllamaAPI, generateResponseWithContext as generateWithOllama } from './ollamaClient.js';
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
 import { getConfig } from '../../config/storageManager.js';
+import { checkEmbeddingConfig } from '../indexation/indexer.js';
 
 /**
  * Type de LLM
@@ -45,6 +46,13 @@ export async function performRAG(question, options = {}) {
     const llmType = forcedLLMType || config.rag?.type || 'api_externe';
 
     await logInfo(`Début du RAG pour la question : "${question}" (LLM: ${llmType})`);
+
+    // Vérifier la configuration des embeddings
+    const embeddingConfig = await checkEmbeddingConfig();
+    
+    if (!embeddingConfig.isValid) {
+      await logWarn('Configuration des embeddings invalide. Utilisation de la recherche par mots-clés.');
+    }
 
     // Étape 1 : Recherche vectorielle (Retrieval)
     const searchResult = await semanticSearchForRAG(question, contextLimit);
