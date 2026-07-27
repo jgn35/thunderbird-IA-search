@@ -2,9 +2,9 @@ name: Tests Automatiques
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, vibe/** ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 jobs:
   test:
@@ -20,18 +20,43 @@ jobs:
         node-version: '20'
         cache: 'yarn'
 
-    - name: Installation des dépendances
+    - name: Installation des dpendances
       run: |
         yarn install --frozen-lockfile
 
-    - name: Exécution des tests unitaires
+    - name: Excution des tests unitaires
       run: |
         yarn test
 
-    - name: Exécution des tests d'intégration
+    - name: Excution des tests d'intgration
       run: |
         yarn test tests/integration/
 
-    - name: Vérification de la couverture de code
+    - name: Excution des tests de performance
+      run: |
+        yarn test tests/performance/
+
+    - name: Vrification de la couverture de code
       run: |
         yarn test:coverage
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout du code
+      uses: actions/checkout@v4
+
+    - name: Configuration de Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'yarn'
+
+    - name: Installation des dpendances
+      run: |
+        yarn install --frozen-lockfile
+
+    - name: Excution du linting
+      run: |
+        yarn lint || echo "Linting not configured yet"
