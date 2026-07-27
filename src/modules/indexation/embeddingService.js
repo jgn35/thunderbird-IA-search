@@ -7,6 +7,14 @@
 import axios from 'axios';
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
 import { getConfig } from '../../config/storageManager.js';
+import {
+  getEmbeddingFromCache,
+  storeEmbeddingInCache,
+  getErrorFromCache,
+  storeErrorInCache,
+  clearCache,
+  getCacheStats,
+} from './embeddingCache.js';
 
 /**
  * Dimension des embeddings Mistral (à vérifier selon le modèle utilisé)
@@ -62,16 +70,18 @@ function isEmbeddingConfigValid(config) {
  * @param {string|string[]} texts - Texte(s) à transformer en embeddings
  * @param {Object} [options] - Options supplémentaires
  * @param {string} [options.model] - Modèle à utiliser
+ * @param {boolean} [options.useCache=true] - Utiliser le cache
  * @param {Object} [options.config] - Configuration personnalisée
  * @returns {Promise<Object>} Résultat avec les embeddings
  */
 export async function generateEmbeddings(texts, options = {}) {
-  try {
-    const {
-      model = DEFAULT_EMBEDDING_MODEL,
-      config: customConfig = null,
-    } = options;
+  const {
+    model = DEFAULT_EMBEDDING_MODEL,
+    useCache = true,
+    config: customConfig = null,
+  } = options;
 
+  try {
     // Récupérer la configuration
     const currentConfig = customConfig || await getConfig();
     const embeddingConfig = currentConfig.rag?.api || {};
@@ -104,13 +114,53 @@ export async function generateEmbeddings(texts, options = {}) {
       };
     }
 
-    // Construire le payload
+    // Vérifier le cache pour chaque texte
+    const cachedEmbeddings = [];
+    const textsToGenerate = [];
+    const cacheIndices = [];
+    
+    if (useCache) {
+      for (let i = 0; i < validTexts.length; i++) {
+        const cached = getEmbeddingFromCache(validTexts[i]);
+        if (cached) {
+          cachedEmbeddings.push(cached);
+          cacheIndices.push(i);
+        } else {
+          // Vérifier si une erreur est en cache
+          const cachedError = getErrorFromCache(validTexts[i]);
+          if (cachedError) {
+            await logWarn(`Erreur en cache pour le texte ${i}: ${cachedError}`);
+            // Retourner une erreur
+            return {
+              success: false,
+              error: `Erreur en cache: ${cachedError}`,
+            };
+          }
+          textsToGenerate.push(validTexts[i]);
+        }
+      }
+    } else {
+      textsToGenerate.push(...validTexts);
+    }
+
+    // Si tous les embeddings sont en cache, retourner le résultat
+    if (textsToGenerate.length === 0) {
+      await logInfo(`Tous les embeddings récupérés depuis le cache (${cachedEmbeddings.length} textes)`);
+      return {
+        success: true,
+        embeddings: cachedEmbeddings,
+        model: model,
+        cached: true,
+      };
+    }
+
+    // Générer les embeddings pour les textes non en cache
     const payload = {
       model,
-      input: validTexts,
+      input: textsToGenerate,
     };
 
-    await logInfo(`Génération d'embeddings pour ${validTexts.length} textes (modèle: ${model})`);
+    await logInfo(`Génération d'embeddings pour ${textsToGenerate.length} textes (modèle: ${model})`);
 
     // Effectuer la requête
     const response = await axios.post(
@@ -124,15 +174,36 @@ export async function generateEmbeddings(texts, options = {}) {
 
     // Traiter la réponse
     if (response.data && response.data.data && response.data.data.length > 0) {
-      const embeddings = response.data.data.map(item => item.embedding);
+      const newEmbeddings = response.data.data.map(item => item.embedding);
 
-      await logInfo(`Embeddings générés avec succès : ${embeddings.length} vecteurs`);
+      // Stocker les nouveaux embeddings dans le cache
+      if (useCache) {
+        for (let i = 0; i < textsToGenerate.length; i++) {
+          storeEmbeddingInCache(textsToGenerate[i], newEmbeddings[i]);
+        }
+      }
+
+      // Combiner les embeddings en cache et les nouveaux
+      const allEmbeddings = [];
+      let cacheIndex = 0;
+      let newIndex = 0;
+      
+      for (let i = 0; i < validTexts.length; i++) {
+        if (useCache && cacheIndices.includes(i)) {
+          allEmbeddings.push(cachedEmbeddings[cacheIndex++]);
+        } else {
+          allEmbeddings.push(newEmbeddings[newIndex++]);
+        }
+      }
+
+      await logInfo(`Embeddings générés avec succès : ${allEmbeddings.length} vecteurs (${newEmbeddings.length} nouveaux, ${cachedEmbeddings.length} en cache)`);
 
       return {
         success: true,
-        embeddings,
+        embeddings: allEmbeddings,
         model: response.data.model,
         usage: response.data.usage,
+        cached: cachedEmbeddings.length > 0,
       };
     }
 
@@ -160,6 +231,14 @@ export async function generateEmbeddings(texts, options = {}) {
       } else if (status >= 500) {
         errorMessage = 'Erreur serveur chez Mistral AI. Veuillez réessayer plus tard.';
       }
+      
+      // Stocker l'erreur dans le cache pour les textes concernés
+      if (useCache && error.response.data && error.response.data.message) {
+        const texts = Array.isArray(texts) ? texts : [texts];
+        for (const text of texts) {
+          storeErrorInCache(text, errorMessage, 300000); // 5 minutes
+        }
+      }
     } else if (error.code === 'ECONNABORTED') {
       errorMessage = 'Timeout : La requête a pris trop de temps. Veuillez réessayer.';
     } else if (error.code === 'ENOTFOUND') {
@@ -180,7 +259,7 @@ export async function generateEmbeddings(texts, options = {}) {
  * @returns {Promise<Object>} Résultat avec l'embedding
  */
 export async function generateSingleEmbedding(text, options = {}) {
-  const result = await generateEmbeddings(text, options);
+  const result = await generateEmbeddings(text, { useCache: true, ...options });
   
   if (!result.success) {
     return result;
@@ -334,4 +413,20 @@ export function getEmbeddingDimension() {
  */
 export function createZeroVector() {
   return new Array(EMBEDDING_DIMENSION).fill(0);
+}
+
+/**
+ * Efface le cache des embeddings
+ * @returns {void}
+ */
+export function clearEmbeddingCache() {
+  clearCache();
+}
+
+/**
+ * Récupère les statistiques du cache
+ * @returns {Object} Statistiques du cache
+ */
+export function getEmbeddingCacheStats() {
+  return getCacheStats();
 }

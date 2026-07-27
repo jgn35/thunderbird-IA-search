@@ -17,4 +17,6 @@ module.exports = {
   moduleNameMapper: {
     '^(\.{1,2}/.*)\.js$': '$1',
   },
+  testTimeout: 10000,
+  forceExit: true,
 };
