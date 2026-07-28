@@ -4,28 +4,36 @@
 
 1. [Introduction](#introduction)
 2. [Installation](#installation)
-3. [Première Utilisation](#première-utilisation)
-4. [Fonctionnalités Principales](#fonctionnalités-principales)
-   - [Indexation des Emails](#indexation-des-emails)
-   - [Recherche dans les Emails](#recherche-dans-les-emails)
-   - [Recherche RAG](#recherche-rag)
-   - [Configuration](#configuration)
-5. [Configuration Avancée](#configuration-avancée)
-6. [Dépannage](#dépannage)
-7. [Questions Fréquentes](#questions-fréquentes)
+3. [Configuration Initiale](#configuration-initiale)
+4. [Utilisation de Base](#utilisation-de-base)
+5. [Fonctionnalités Avancées](#fonctionnalités-avancées)
+6. [Configuration du RAG](#configuration-du-rag)
+7. [Dépannage](#dépannage)
+8. [Questions Fréquentes](#questions-fréquentes)
 
 ---
 
 ## 🎯 Introduction
 
-**Thunderbird RAG Search** est une extension pour Mozilla Thunderbird qui vous permet de :
+**Thunderbird RAG Search** est une extension qui vous permet de :
 
-✅ **Indexer** vos emails pour une recherche rapide
-✅ **Rechercher** des informations spécifiques dans vos emails
-✅ **Générer des réponses** intelligentes basées sur le contenu de vos emails (RAG)
-✅ **Choisir** entre un LLM local (Ollama) ou une API externe (Mistral AI)
+- 🔍 **Indexer** vos emails pour une recherche rapide
+- 🧠 **Rechercher** des informations spécifiques dans vos emails
+- 💬 **Poser des questions** en langage naturel et obtenir des réponses basées sur vos emails
+- ⚡ **Choisir** entre un LLM local (Ollama) ou une API externe (Mistral AI)
 
-Cette extension est conçue pour un **usage personnel** et ne partage **aucune donnée** sans votre consentement explicite.
+### Cas d'Usage
+
+- Trouver des informations précises dans vos anciens emails
+- Résumer des conversations email
+- Rechercher des dates, noms ou détails spécifiques
+- Générer des réponses basées sur le contenu de vos emails
+
+### Public Cible
+
+- Utilisateurs personnels de Thunderbird
+- Professionnels gérant de nombreux emails
+- Toute personne ayant besoin de rechercher efficacement dans ses emails
 
 ---
 
@@ -34,8 +42,7 @@ Cette extension est conçue pour un **usage personnel** et ne partage **aucune d
 ### Prérequis
 
 - **Thunderbird** : Version 102.0 ou supérieure
-- **Espace disque** : Environ 100 Mo par 10 000 emails (pour ChromaDB)
-- **Mémoire** : 2 Go minimum recommandés
+- **Connexion Internet** : Pour utiliser l'API Mistral (optionnel si vous utilisez Ollama)
 
 ### Installation pour les Développeurs
 
@@ -51,345 +58,449 @@ Cette extension est conçue pour un **usage personnel** et ne partage **aucune d
    ```
 
 3. **Charger l'extension dans Thunderbird** :
-   - Ouvrez Thunderbird
-   - Allez dans `Menu (☰) → Add-ons et thèmes → Outils pour les développeurs`
-   - Cliquez sur `Charger un module complémentaire temporaire`
-   - Sélectionnez le fichier `manifest.json` dans le dossier du projet
+   - Ouvrir Thunderbird
+   - Aller dans `Menu ▶ Add-ons et thèmes ▶ Outils pour les développeurs`
+   - Cliquer sur `Charger un module complémentaire temporaire`
+   - Sélectionner le fichier `manifest.json` dans le dossier du projet
 
-4. **Redémarrer Thunderbird** si nécessaire
+### Installation pour les Utilisateurs Finaux
 
-### Installation pour les Utilisateurs Finaux (à venir)
-
-*Une version packagée (.xpi) sera disponible prochainement pour une installation directe.*
+*À venir : Package .xpi pour installation directe depuis le Mozilla Add-ons Store.*
 
 ---
 
-## 🚀 Première Utilisation
+## ⚙️ Configuration Initiale
 
-### Étape 1 : Sélectionner les Dossiers à Indexer
+### Première Ouverture
 
-1. Ouvrez la barre latérale de l'extension en cliquant sur l'icône **RAG Search** dans la barre d'outils de Thunderbird
-2. Allez dans l'onglet **Configuration**
-3. Dans la section **Indexation**, sélectionnez les dossiers que vous souhaitez indexer dans le champ **Dossiers à indexer**
-   - Maintenez la touche `Ctrl` (ou `Cmd` sur Mac) enfoncée pour sélectionner plusieurs dossiers
-4. Cliquez sur **Sauvegarder la configuration**
+1. Après l'installation, ouvrez Thunderbird
+2. Cliquez sur l'icône de l'extension dans la barre d'outils (ou allez dans `Menu ▶ Add-ons`)
+3. La barre latérale de l'extension s'ouvre
 
-### Étape 2 : Configurer le LLM
+### Sélection des Dossiers à Indexer
 
-Choisissez entre deux options pour le traitement du langage naturel :
+1. Dans l'onglet **"Indexation"** :
+   - Cliquez sur `Sélectionner les dossiers`
+   - Cochez les dossiers que vous souhaitez indexer
+   - Le dossier **Spam** est exclu par défaut (configurable)
+   - Cliquez sur `Enregistrer`
 
-#### Option A : API Externe (Mistral AI)
+2. **Lancer l'indexation** :
+   - Cliquez sur `Indexer maintenant`
+   - L'indexation commence et affiche la progression
+   - Une notification apparaît une fois terminée
 
-1. Dans l'onglet **Configuration**, section **RAG**
-2. Sélectionnez **API Externe (Mistral AI)**
-3. Entrez votre **Clé API Mistral** (disponible sur [Mistral AI](https://mistral.ai/))
-4. Vérifiez que l'**Endpoint** est correct (`https://api.mistral.ai/v1`)
-5. Sélectionnez un **Modèle** (ex: `mistral-tiny`, `mistral-small`)
-6. Cliquez sur **Sauvegarder la configuration**
+### Configuration de Base
 
-#### Option B : LLM Local (Ollama)
+Dans l'onglet **"Configuration"** :
 
-1. Installez [Ollama](https://ollama.ai/) sur votre machine
-2. Téléchargez un modèle compatible :
+| Option | Description | Valeur par défaut |
+|--------|-------------|-------------------|
+| Dossiers exclus | Dossiers à exclure de l'indexation | `['Spam']` |
+| Indexer les pièces jointes | Inclure les pièces jointes dans l'indexation | `false` |
+| Taille maximale des emails | Taille maximale en octets | `10485760` (10 Mo) |
+
+---
+
+## 🎯 Utilisation de Base
+
+### Recherche Simple
+
+1. Dans l'onglet **"Recherche"** :
+   - Entrez votre requête dans le champ de recherche
+   - Appuyez sur `Entrée` ou cliquez sur `Rechercher`
+   - Les résultats s'affichent avec :
+     - Sujet de l'email
+     - Extrait du contenu
+     - Dossier
+     - Date
+     - Score de pertinence
+
+2. **Filtres disponibles** :
+   - Par dossier
+   - Par date (de/à)
+   - Par expéditeur
+   - Par destinataire
+
+### Recherche Avancée
+
+1. Cliquez sur `Recherche avancée`
+2. Remplissez les critères :
+   - Requête (obligatoire)
+   - Dossiers à inclure
+   - Dossiers à exclure
+   - Date de début
+   - Date de fin
+   - Expéditeur
+   - Destinataire
+3. Cliquez sur `Rechercher`
+
+### RAG (Retrieval-Augmented Generation)
+
+1. Dans l'onglet **"RAG"** :
+   - Entrez votre question en langage naturel
+   - Exemples :
+     - "Quelle est l'heure de la réunion de demain ?"
+     - "Qu'a dit Jean dans son dernier email ?"
+     - "Résumé la conversation avec Marie"
+   - Cliquez sur `Poser la question`
+   - L'extension :
+     - Recherche les emails pertinents
+     - Extrait le contexte
+     - Génère une réponse basée sur vos emails
+
+2. **Résultats** :
+   - Réponse générée par le LLM
+   - Liste des emails utilisés comme contexte
+   - Score de pertinence pour chaque email
+
+---
+
+## 🚀 Fonctionnalités Avancées
+
+### Indexation Incrémentale
+
+L'extension indexe automatiquement :
+- Les **nouveaux emails** arrivant dans les dossiers sélectionnés
+- Les **emails modifiés**
+- Les **emails déplacés** vers un dossier indexé
+
+**Désactivation** :
+- Dans l'onglet **"Configuration"**
+- Décochez `Indexation automatique`
+- Cliquez sur `Enregistrer`
+
+### Indexation Manuelle
+
+Pour forcer une réindexation complète :
+1. Allez dans l'onglet **"Indexation"**
+2. Cliquez sur `Réindexer tout`
+3. Confirmez l'action
+
+### Suppression de l'Index
+
+Pour supprimer tous les emails indexés :
+1. Allez dans l'onglet **"Indexation"**
+2. Cliquez sur `Supprimer l'index`
+3. Confirmez l'action
+
+⚠️ **Attention** : Cette action est irréversible. Vous devrez réindexer vos emails.
+
+### Historique des Recherches
+
+L'extension conserve un historique de vos recherches :
+- Dans l'onglet **"Historique"**
+- Liste des dernières recherches
+- Possibilité de relancer une recherche
+- Possibilité de supprimer l'historique
+
+### Export des Logs
+
+Pour diagnostiquer des problèmes :
+1. Allez dans l'onglet **"Logs"**
+2. Cliquez sur `Exporter les logs`
+3. Choisissez un emplacement pour enregistrer le fichier
+
+---
+
+## ⚡ Configuration du RAG
+
+### Choix du LLM
+
+Deux options disponibles :
+
+#### 1. API Externe (Mistral AI) - Recommandé
+
+**Avantages** :
+- ✅ Pas besoin d'installer de modèle local
+- ✅ Modèles optimisés pour le français et l'anglais
+- ✅ Performances élevées
+- ✅ Mises à jour automatiques des modèles
+
+**Inconvénients** :
+- ❌ Nécessite une clé API
+- ❌ Nécessite une connexion internet
+- ❌ Coût potentiel (selon l'utilisation)
+
+**Configuration** :
+
+1. Allez dans l'onglet **"RAG"**
+2. Sélectionnez `API Externe (Mistral AI)`
+3. Remplissez les champs :
+   - **Endpoint** : `https://api.mistral.ai/v1` (par défaut)
+   - **Endpoint Embeddings** : `https://api.mistral.ai/v1/embeddings` (par défaut)
+   - **Clé API** : Votre clé API Mistral
+4. Cliquez sur `Enregistrer`
+
+**Obtenir une clé API Mistral** :
+1. Allez sur [https://console.mistral.ai/](https://console.mistral.ai/)
+2. Créez un compte ou connectez-vous
+3. Allez dans `Settings ▶ API Keys`
+4. Générez une nouvelle clé API
+5. Copiez la clé et collez-la dans la configuration
+
+#### 2. LLM Local (Ollama)
+
+**Avantages** :
+- ✅ Pas besoin de clé API
+- ✅ Pas besoin de connexion internet
+- ✅ Données 100% locales
+- ✅ Gratuit
+
+**Inconvénients** :
+- ❌ Nécessite d'installer Ollama
+- ❌ Nécessite de télécharger les modèles
+- ❌ Consommation de ressources locales
+- ❌ Performances variables selon le matériel
+
+**Configuration** :
+
+1. **Installer Ollama** :
    ```bash
-   ollama pull mistral-7b
+   # Linux/Mac
+   curl -fsSL https://ollama.ai/install.sh | sh
+   
+   # Windows (PowerShell)
+   Invoke-WebRequest -Uri "https://ollama.ai/install.ps1" -UseBasicParsing | Invoke-Expression
    ```
-3. Démarrez le serveur Ollama :
+
+2. **Démarrer Ollama** :
    ```bash
    ollama serve
    ```
-4. Dans l'extension, sélectionnez **Local (Ollama)**
-5. Vérifiez que l'**URL du serveur** est correcte (`http://localhost:11434`)
-6. Entrez le **Modèle** (`mistral-7b`)
-7. Cliquez sur **Vérifier le statut** pour confirmer que Ollama est accessible
-8. Cliquez sur **Sauvegarder la configuration**
 
-### Étape 3 : Indexer vos Emails
+3. **Télécharger un modèle** :
+   ```bash
+   ollama pull mistral-7b
+   ```
 
-1. Retournez dans l'onglet **Recherche**
-2. Cliquez sur **Indexer tous les emails**
-3. Attendez la fin de l'indexation (un indicateur de progression s'affiche)
-4. Une fois terminée, le nombre d'emails indexés s'affiche
+4. **Configurer l'extension** :
+   - Allez dans l'onglet **"RAG"**
+   - Sélectionnez `LLM Local (Ollama)`
+   - Remplissez les champs :
+     - **URL** : `http://localhost:11434` (par défaut)
+     - **Modèle** : `mistral-7b` (ou autre modèle téléchargé)
+   - Cliquez sur `Enregistrer`
 
-✅ **Vos emails sont maintenant prêts pour la recherche !**
+### Modèles Recommandés
 
----
+#### Pour Mistral AI (API)
 
-## ✨ Fonctionnalités Principales
+| Modèle | Description | Cas d'usage |
+|--------|-------------|-------------|
+| `mistral-tiny` | Modèle léger et rapide | Recherche simple, tests |
+| `mistral-small` | Équilibre vitesse/qualité | Usage général |
+| `mistral-medium` | Meilleure qualité | Réponses complexes |
 
-### Indexation des Emails
+#### Pour Ollama (Local)
 
-#### Indexation Complète
-
-- **Quand l'utiliser** : Première utilisation, ou après avoir ajouté de nouveaux dossiers
-- **Comment faire** : Cliquez sur **Indexer tous les emails**
-- **Durée** : Environ 30-45 minutes pour 10 000 emails (sur une machine standard)
-
-#### Indexation Incrémentale
-
-- **Quand l'utiliser** : Pour mettre à jour l'index avec les emails récemment reçus ou modifiés
-- **Comment faire** : Cliquez sur **Indexer les modifiés**
-- **Durée** : Quelques secondes à quelques minutes selon le nombre d'emails modifiés
-
-#### Vider l'Index
-
-- **Quand l'utiliser** : Pour réinitialiser complètement l'index
-- **Comment faire** : Cliquez sur **Vider l'index** (une confirmation sera demandée)
-- **Attention** : Cette action ne peut pas être annulée
-
-**Statistiques d'Indexation** :
-- **Emails indexés** : Nombre total d'emails dans l'index
-- **Dernière indexation** : Date et heure de la dernière indexation complète
-- **Indexation en cours** : Indique si une indexation est actuellement en cours
+| Modèle | Taille | RAM requise | Cas d'usage |
+|--------|--------|-------------|-------------|
+| `mistral-7b` | 7B | 8 Go | Usage général |
+| `llama2:7b` | 7B | 8 Go | Alternative |
+| `phi3:3.8b` | 3.8B | 4 Go | Léger |
+| `mistral-7b-instruct` | 7B | 8 Go | Instructions |
 
 ---
 
-### Recherche dans les Emails
+## 🔧 Dépannage
 
-#### Recherche Simple
+### Problèmes d'Indexation
 
-1. Dans l'onglet **Recherche**, entrez votre requête dans le champ de recherche
-2. Appuyez sur `Entrée` ou cliquez sur le bouton de recherche
-3. Les résultats s'affichent avec :
-   - **Sujet** de l'email
-   - **Expéditeur**, **Date**, **Dossier**
-   - **Extrait** du contenu
-   - **Score** de pertinence
-
-#### Recherche Avancée
-
-Pour affiner vos résultats, vous pouvez utiliser les filtres suivants dans la configuration :
-
-- **Dossiers** : Limiter la recherche à des dossiers spécifiques
-- **Date** : Filtrer par plage de dates
-- **Expéditeur/Destinataire** : Filtrer par personne
-
----
-
-### Recherche RAG
-
-Le **RAG (Retrieval-Augmented Generation)** combine la recherche vectorielle avec un modèle de langage pour fournir des réponses précises basées sur vos emails.
-
-#### Comment utiliser le RAG
-
-1. Activez la case **Utiliser RAG** dans l'onglet Recherche
-2. Sélectionnez le type de LLM (API Externe ou Local)
-3. Entrez votre question en français ou en anglais
-4. L'extension va :
-   - Rechercher les emails pertinents
-   - Extraire les informations clés
-   - Générer une réponse basée sur ces informations
-
-#### Exemples de Questions RAG
-
-| Question | Résultat |
-|----------|----------|
-| "Quelle est la date de la réunion avec l'équipe marketing ?" | L'extension trouve les emails contenant des informations sur la réunion et répond avec la date exacte |
-| "Quel est le montant de la facture n°12345 ?" | Recherche dans vos emails pour trouver le montant de la facture |
-| "Qui a envoyé le rapport trimestriel ?" | Identifie l'expéditeur du rapport dans vos emails |
-| "Résumé de la conversation avec Jean Dupont" | Génère un résumé de tous les emails échangés avec Jean Dupont |
-
-#### Limites du RAG
-
-- Le RAG ne peut répondre que **basé sur les emails indexés**
-- Si aucun email pertinent n'est trouvé, une réponse générique sera affichée
-- La qualité de la réponse dépend de la qualité des emails indexés
-
----
-
-### Configuration
-
-#### Onglet Configuration
-
-L'onglet **Configuration** vous permet de personnaliser le comportement de l'extension.
-
-**Section Indexation** :
-
-| Option | Description | Valeur par Défaut |
-|--------|-------------|-------------------|
-| Dossiers exclus | Dossiers à exclure de l'indexation | Spam |
-| Indexer les pièces jointes | Si activé, les pièces jointes seront indexées | Désactivé |
-| Taille max des emails | Taille maximale des emails à indexer (en Mo) | 10 Mo |
-
-**Section RAG** :
-
-| Option | Description | Valeur par Défaut |
-|--------|-------------|-------------------|
-| Type de LLM | API Externe ou Local | API Externe |
-| Endpoint API | URL de l'API Mistral | https://api.mistral.ai/v1 |
-| Clé API | Votre clé API Mistral | - |
-| Modèle API | Modèle à utiliser avec Mistral | mistral-tiny |
-| URL Ollama | URL du serveur Ollama | http://localhost:11434 |
-| Modèle Ollama | Modèle à utiliser avec Ollama | mistral-7b |
-
----
-
-## ⚙ Configuration Avancée
-
-### Personnalisation des Dossiers Exclus
-
-Par défaut, seul le dossier **Spam** est exclu de l'indexation. Vous pouvez ajouter d'autres dossiers :
-
-1. Allez dans **Configuration → Indexation**
-2. Dans le champ **Dossiers exclus**, entrez les noms des dossiers à exclure
-3. Séparer les noms par des virgules (ex: `Spam, Trash, Archives`)
-4. Sauvegardez la configuration
-
-### Indexation des Pièces Jointes
-
-⚠️ **Attention** : L'indexation des pièces jointes peut :
-- Augmenter considérablement la taille de l'index
-- Ralentir l'indexation
-- Consommer plus de mémoire
-
-Pour activer :
-1. Allez dans **Configuration → Indexation**
-2. Cochez **Indexer les pièces jointes**
-3. Sauvegardez la configuration
-4. Réindexez vos emails
-
-### Changement de la Taille Maximale des Emails
-
-Les emails trop volumineux sont ignorés par défaut (10 Mo). Pour modifier cette limite :
-
-1. Allez dans **Configuration → Indexation**
-2. Modifiez la valeur **Taille max des emails (Mo)**
-3. Sauvegardez la configuration
-
-### Utilisation de Plusieurs Clés API
-
-Si vous avez plusieurs clés API (pour différents modèles ou quotas), vous pouvez :
-
-1. Sauvegarder vos clés API dans un gestionnaire de mots de passe
-2. Copier-coller la clé appropriée dans la configuration lorsque nécessaire
-3. Changer de clé API et réessayer en cas d'erreur
-
-### Optimisation des Performances
-
-Pour améliorer les performances :
-
-- **Limiter le nombre de dossiers indexés** : Indexez uniquement les dossiers importants
-- **Réduire la taille maximale des emails** : 5-10 Mo est généralement suffisant
-- **Désactiver l'indexation des pièces jointes** : Sauf si absolument nécessaire
-- **Utiliser un LLM local** : Ollama peut être plus rapide que les API externes (mais nécessite des ressources locales)
-
----
-
-## 🐛 Dépannage
-
-### L'extension ne s'affiche pas
-
-**Solutions** :
-1. Vérifiez que l'extension est bien chargée dans Thunderbird
-2. Redémarrez Thunderbird
-3. Vérifiez la console pour les erreurs (`Menu → Plus d'outils → Console web`)
-
-### Aucune indexation ne se produit
+#### Aucun email indexé
 
 **Causes possibles** :
-- Aucun dossier sélectionné pour l'indexation
-- Tous les dossiers sélectionnés sont vides
-- Problème de permissions
+- Aucun dossier sélectionné
+- Tous les dossiers sont exclus
+- Emails trop grands
 
 **Solutions** :
-1. Vérifiez que des dossiers sont bien sélectionnés dans la configuration
-2. Essayez d'indexer manuellement avec le bouton **Indexer tous les emails**
-3. Vérifiez les logs dans l'onglet **Logs**
+1. Vérifiez que des dossiers sont sélectionnés dans l'onglet **"Indexation"**
+2. Vérifiez que le dossier **Spam** n'est pas le seul sélectionné (il est exclu par défaut)
+3. Vérifiez la taille maximale des emails dans la configuration
+4. Essayez de lancer une indexation manuelle
 
-### Erreur "Clé API invalide"
-
-**Causes possibles** :
-- La clé API est incorrecte
-- La clé API a expiré
-- Le compte Mistral AI n'a plus de crédits
-
-**Solutions** :
-1. Vérifiez que la clé API est correcte
-2. Générez une nouvelle clé API sur [Mistral AI](https://mistral.ai/)
-3. Vérifiez votre solde de crédits
-
-### Ollama non accessible
+#### Indexation bloquée
 
 **Causes possibles** :
-- Ollama n'est pas installé
-- Le serveur Ollama n'est pas démarré
-- L'URL du serveur est incorrecte
-
-**Solutions** :
-1. Installez Ollama : [https://ollama.ai/](https://ollama.ai/)
-2. Démarrez le serveur : `ollama serve`
-3. Vérifiez que l'URL est correcte (`http://localhost:11434`)
-4. Cliquez sur **Vérifier le statut** dans la configuration
-
-### Indexation très lente
-
-**Causes possibles** :
+- Problème de connexion à l'API Mistral
 - Trop d'emails à indexer
-- Emails très volumineux
-- Ressources machine insuffisantes
 
 **Solutions** :
-1. Réduisez le nombre de dossiers indexés
-2. Diminuez la taille maximale des emails
-3. Désactivez l'indexation des pièces jointes
-4. Indexez par petits lots (utilisez **Indexer les modifiés** régulièrement)
+1. Vérifiez votre connexion internet
+2. Vérifiez la configuration des embeddings
+3. Essayez d'indexer moins de dossiers
+4. Attendez que l'indexation se termine (peut prendre du temps)
 
-### Recherche sans résultats
+### Problèmes de Recherche
+
+#### Aucun résultat trouvé
 
 **Causes possibles** :
-- L'index est vide
-- La requête ne correspond à aucun email
-- Les emails pertinents ne sont pas indexés
+- Aucun email indexé
+- Requête trop courte
+- Problème avec les embeddings
 
 **Solutions** :
-1. Vérifiez que des emails sont bien indexés (onglet Recherche)
-2. Essayez une requête plus générale
-3. Vérifiez que les dossiers contenant les emails pertinents sont sélectionnés
-4. Réindexez vos emails
+1. Vérifiez que l'indexation a été exécutée
+2. Essayez une requête plus longue (au moins 2 caractères)
+3. Vérifiez la configuration des embeddings
+4. Essayez une recherche par mots-clés simple
+
+#### Résultats non pertinents
+
+**Causes possibles** :
+- Peu d'emails indexés
+- Requête trop vague
+- Problème avec les embeddings
+
+**Solutions** :
+1. Indexez plus d'emails
+2. Soyez plus précis dans votre requête
+3. Vérifiez la configuration des embeddings
+4. Essayez avec un autre LLM
+
+### Problèmes API Mistral
+
+#### Erreur "Clé API invalide"
+
+**Solution** :
+1. Vérifiez que votre clé API est correcte
+2. Générez une nouvelle clé API sur le tableau de bord Mistral
+3. Vérifiez que vous n'avez pas dépassé votre quota
+
+#### Erreur "Endpoint introuvable"
+
+**Solution** :
+1. Vérifiez l'endpoint dans la configuration
+2. Utilisez `https://api.mistral.ai/v1` (par défaut)
+3. Vérifiez votre connexion internet
+
+#### Timeout
+
+**Solution** :
+1. Vérifiez votre connexion internet
+2. Essayez à nouveau plus tard
+3. Si le problème persiste, contactez le support Mistral
+
+### Problèmes Ollama
+
+#### Ollama ne répond pas
+
+**Solutions** :
+1. Vérifiez qu'Ollama est installé : `ollama --version`
+2. Vérifiez qu'Ollama est en cours d'exécution : `ollama serve`
+3. Vérifiez l'URL dans la configuration : `http://localhost:11434`
+4. Vérifiez que le modèle est téléchargé : `ollama list`
+
+#### Modèle introuvable
+
+**Solution** :
+1. Téléchargez le modèle : `ollama pull mistral-7b`
+2. Vérifiez que le modèle est téléchargé : `ollama list`
+3. Vérifiez le nom du modèle dans la configuration
+
+#### Manque de mémoire
+
+**Solutions** :
+1. Fermez d'autres applications
+2. Utilisez un modèle plus petit (ex: `phi3:3.8b`)
+3. Augmentez la mémoire allouée à Ollama
+4. Utilisez un GPU si disponible
 
 ---
 
 ## ❓ Questions Fréquentes
 
-### Q : Mes emails sont-ils envoyés à des serveurs externes ?
-**R** : Non, sauf si vous utilisez explicitement une API externe (Mistral AI). Avec Ollama, tout reste local sur votre machine. Même avec Mistral AI, seuls les prompts et réponses sont envoyés, jamais vos emails bruts.
+### Q: L'extension fonctionne-t-elle hors ligne ?
 
-### Q : Puis-je indexer tous mes emails, y compris les anciens ?
-**R** : Oui, l'extension peut indexer tous les emails des dossiers sélectionnés, quel que soit leur âge.
+**R:** 
+- ✅ **Oui**, si vous utilisez Ollama (LLM local)
+- ❌ **Non**, si vous utilisez l'API Mistral (nécessite une connexion internet)
 
-### Q : Combien d'espace disque l'index utilise-t-il ?
-**R** : Environ 10-20 Ko par email pour ChromaDB. Pour 10 000 emails, comptez environ 100-200 Mo.
+### Q: Mes emails sont-ils envoyés à des tiers ?
 
-### Q : Puis-je utiliser l'extension avec d'autres fournisseurs de LLM ?
-**R** : Actuellement, seuls Mistral AI et Ollama sont supportés. L'ajout d'autres fournisseurs est prévu pour les futures versions.
+**R:** 
+- ❌ **Non**, vos emails ne sont **jamais** envoyés à des tiers sans votre consentement
+- Les emails sont indexés **localement** sur votre machine
+- Seuls les embeddings (vecteurs numériques) sont envoyés à l'API Mistral si vous utilisez cette option
+- Vous pouvez utiliser Ollama pour une solution 100% locale
 
-### Q : Comment puis-je ajouter une nouvelle langue ?
-**R** : L'extension supporte actuellement le français et l'anglais. Pour ajouter une nouvelle langue, vous devez :
-1. Ajouter les stop words pour la langue dans `queryProcessor.js`
-2. Mettre à jour la détection de langue
-3. Tester la nouvelle langue
+### Q: Combien de temps prend l'indexation ?
 
-*Voir la [documentation technique](technical.md) pour plus de détails.*
+**R:** 
+- 100 emails : < 1 minute
+- 1 000 emails : 5-10 minutes
+- 10 000 emails : 30-60 minutes
 
-### Q : L'extension fonctionne-t-elle hors ligne ?
-**R** : Oui, si vous utilisez Ollama (LLM local). Avec Mistral AI, une connexion internet est nécessaire.
+Le temps dépend de :
+- La taille de vos emails
+- La vitesse de votre connexion internet (pour les embeddings)
+- Les performances de votre machine
 
-### Q : Puis-je exporter/importer mon index ?
-**R** : Actuellement, l'export/import de l'index n'est pas supporté. Cette fonctionnalité est prévue pour les futures versions.
+### Q: Puis-je indexer tous mes emails ?
 
-### Q : Comment puis-je contribuer au projet ?
-**R** : Les contributions sont les bienvenues ! Voir le [README](README.md) pour les instructions.
+**R:** 
+- ✅ **Oui**, vous pouvez indexer tous vos emails
+- Cependant, l'indexation de milliers d'emails peut prendre du temps
+- Vous pouvez exclure certains dossiers (ex: Spam, Trash) pour gagner du temps
+
+### Q: Comment mettre à jour l'extension ?
+
+**R:** 
+1. Pour les développeurs : `git pull` puis recharger l'extension dans Thunderbird
+2. Pour les utilisateurs finaux : Mise à jour automatique via le Mozilla Add-ons Store (à venir)
+
+### Q: Puis-je utiliser d'autres LLM ?
+
+**R:** 
+- Actuellement, seuls Mistral AI et Ollama sont supportés
+- Nous prévoyons d'ajouter le support d'autres fournisseurs (OpenAI, Anthropic, etc.) dans le futur
+- Vous pouvez contribuer en ajoutant le support de nouveaux fournisseurs
+
+### Q: Comment désinstaller l'extension ?
+
+**R:** 
+1. Allez dans `Menu ▶ Add-ons et thèmes`
+2. Trouvez l'extension **Thunderbird RAG Search**
+3. Cliquez sur les trois points (⋮) puis `Supprimer`
+4. Confirmez la suppression
+
+### Q: Mes données sont-elles sauvegardées ?
+
+**R:** 
+- ✅ **Oui**, vos données (index, configuration) sont sauvegardées dans le stockage local de Thunderbird
+- ❌ **Non**, elles ne sont pas sauvegardées dans le cloud
+- Si vous désinstallez l'extension, vos données seront perdues
+- Si vous réinstallez l'extension, vous devrez reconfigurer et réindexer
+
+### Q: Puis-je exporter/importer mes données ?
+
+**R:** 
+- **Export des logs** : Oui, via l'onglet **"Logs"**
+- **Export de l'index** : Non, pas encore implémenté (à venir)
+- **Export de la configuration** : Non, pas encore implémenté (à venir)
 
 ---
 
-## 📧 Support
+## 📞 Support
 
-Pour toute question ou problème non résolu par ce guide :
+### Signaler un Bug
 
-1. Consultez les [logs](#dépannage) dans l'extension
-2. Vérifiez les [problèmes connus](#dépannage)
-3. Ouvrez une issue sur GitHub : [https://github.com/jgn35/thunderbird-IA-search/issues](https://github.com/jgn35/thunderbird-IA-search/issues)
+1. Vérifiez que le bug n'a pas déjà été signalé
+2. Ouvrez une issue sur GitHub : [https://github.com/jgn35/thunderbird-IA-search/issues](https://github.com/jgn35/thunderbird-IA-search/issues)
+3. Incluez :
+   - Description détaillée du bug
+   - Étapes pour reproduire
+   - Capture d'écran si possible
+   - Version de Thunderbird
+   - Version de l'extension
+   - Logs exportés (si applicable)
 
----
+### Contribuer
 
-*Guide utilisateur mis à jour le : {date}*
+Voir le [Guide de Contribution](contributing.md) pour savoir comment contribuer au projet.
+
+### Documentation Technique
+
+Voir la [Documentation Technique](technical.md) pour plus de détails sur l'architecture et l'implémentation.

@@ -3,7 +3,7 @@
  * @module modules/recherche/searchEngine
  */
 
-import { searchEmails } from '../indexation/chromaManager.js';
+import { searchEmails } from '../indexation/vectorStore.js';
 import { processQuery, isValidQuery } from './queryProcessor.js';
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
 import { getConfig } from '../../config/storageManager.js';
@@ -11,7 +11,7 @@ import { getConfig } from '../../config/storageManager.js';
 /**
  * Résultat de recherche
  * @typedef {Object} SearchResult
- * @property {string} id - ID du document dans ChromaDB
+ * @property {string} id - ID du document dans le Vector Store
  * @property {string} emailId - ID de l'email dans Thunderbird
  * @property {string} subject - Sujet de l'email
  * @property {string} body - Corps de l'email
@@ -80,7 +80,7 @@ export async function search(query, options = {}) {
 
     await logInfo(`Recherche : "${query}" (langue: ${language})`);
 
-    // Effectuer la recherche dans ChromaDB
+    // Effectuer la recherche dans le Vector Store
     let results = await searchEmails(processedQuery, limit);
 
     // Appliquer les filtres
@@ -181,7 +181,7 @@ export async function advancedSearch(criteria) {
 
     await logInfo(`Recherche avancée : "${query}"`);
 
-    // Effectuer la recherche dans ChromaDB
+    // Effectuer la recherche dans le Vector Store
     let results = await searchEmails(processedQuery, limit * 2); // Récupérer plus de résultats pour appliquer les filtres
 
     // Appliquer les filtres

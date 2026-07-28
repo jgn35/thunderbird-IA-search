@@ -1,7 +1,7 @@
 {
   "name": "thunderbird-rag-extension",
   "version": "1.0.0",
-  "description": "Extension Thunderbird pour indexation et recherche RAG avec ChromaDB et LLM (Mistral/Ollama)",
+  "description": "Extension Thunderbird pour indexation et recherche RAG avec IndexedDB et LLM (Mistral/Ollama)",
   "main": "src/modules/ui/sidebar.js",
   "scripts": {
     "test": "jest",
@@ -15,17 +15,16 @@
     "thunderbird",
     "extension",
     "rag",
-    "chromadb",
+    "indexeddb",
     "llm",
     "mistral",
-    "ollama"
+    "ollama",
+    "embeddings"
   ],
   "author": "JGoujou Noliu",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.6.0",
-    "chromadb": "^1.0.0",
-    "langchain": "^0.1.0"
+    "axios": "^1.6.0"
   },
   "devDependencies": {
     "@babel/preset-env": "^8.0.2",

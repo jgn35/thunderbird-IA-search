@@ -7,14 +7,16 @@ import { logInfo, logError, logWarn } from '../../utils/logger.js';
 import { getConfig, saveConfig } from '../../config/storageManager.js';
 import { fetchEmailsForIndexation, fetchModifiedEmails, emailExists } from './emailFetcher.js';
 import {
-  initChromaClient,
+  initVectorStore,
   addOrUpdateEmail,
   deleteEmail,
   isEmailIndexed,
   getAllIndexedEmails,
   clearAllEmails,
-} from './chromaManager.js';
+  getStats,
+} from './vectorStore.js';
 import { extractMainBody } from '../../utils/helpers.js';
+import { generateSingleEmbedding } from './embeddingService.js';
 
 /**
  * État de l'indexation
@@ -62,7 +64,7 @@ function updateIndexationState(updates) {
  */
 export async function initIndexer() {
   try {
-    await initChromaClient();
+    await initVectorStore();
     await logInfo('Module d\'indexation initialisé');
   } catch (error) {
     await logError(error, 'Initialisation du module d\'indexation');
@@ -92,6 +94,7 @@ export async function indexEmail(emailData) {
     // Créer les données à indexer
     const dataToIndex = {
       id,
+      emailId: id,
       subject,
       body: cleanedBody,
       from,
@@ -108,7 +111,7 @@ export async function indexEmail(emailData) {
       await logInfo(`Email ${id} déjà indexé, mise à jour`);
     }
 
-    // Ajouter ou mettre à jour dans ChromaDB
+    // Ajouter ou mettre à jour dans le Vector Store
     await addOrUpdateEmail(dataToIndex);
     
     await logInfo(`Email indexé : ${id} (${subject})`);
@@ -162,6 +165,14 @@ export async function indexAllEmails(selectedFolderIds, config = null) {
   try {
     await logInfo(`Début de l'indexation complète pour ${selectedFolderIds.length} dossiers`);
 
+    // Vérifier la configuration des embeddings
+    const currentConfig = config || await getConfig();
+    const embeddingConfig = currentConfig.rag?.api;
+    
+    if (!embeddingConfig || !embeddingConfig.apiKey || embeddingConfig.apiKey.trim() === '') {
+      await logWarn('Aucune clé API Mistral configurée. Utilisation de la recherche par mots-clés uniquement.');
+    }
+
     // Récupérer les emails à indexer
     const emails = await fetchEmailsForIndexation(selectedFolderIds, config);
     
@@ -195,9 +206,9 @@ export async function indexAllEmails(selectedFolderIds, config = null) {
     });
 
     // Sauvegarder la date de la dernière indexation dans la config
-    const currentConfig = config || await getConfig();
+    const currentConfigForSave = config || await getConfig();
     await saveConfig({
-      ...currentConfig,
+      ...currentConfigForSave,
       lastIndexation: new Date().toISOString(),
     });
 
@@ -361,9 +372,9 @@ export async function clearIndex() {
  */
 export async function getIndexStats() {
   try {
-    const indexedEmails = await getAllIndexedEmails();
+    const stats = await getStats();
     return {
-      totalIndexed: indexedEmails.length,
+      totalIndexed: stats.totalEmails,
       lastIndexation: indexationState.lastIndexation,
       isIndexing: indexationState.isIndexing,
     };
@@ -385,4 +396,25 @@ export async function getIndexStats() {
  */
 export async function checkEmailIndexed(emailId, lastModified = null) {
   return await isEmailIndexed(emailId, lastModified);
+}
+
+/**
+ * Vérifie la configuration des embeddings
+ * @returns {Promise<Object>} Résultat de la vérification
+ */
+export async function checkEmbeddingConfig() {
+  const config = await getConfig();
+  const apiConfig = config.rag?.api || {};
+  
+  const isValid = apiConfig.endpoint && apiConfig.endpoint.trim() !== '' &&
+    apiConfig.apiKey && apiConfig.apiKey.trim() !== '';
+
+  return {
+    isValid,
+    error: isValid ? null : 'Configuration API Mistral invalide pour les embeddings.',
+    details: {
+      endpoint: apiConfig.endpoint || '',
+      hasApiKey: !!apiConfig.apiKey,
+    },
+  };
 }
