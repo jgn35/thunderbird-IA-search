@@ -7,8 +7,14 @@ import {
   getEmbeddingDimension,
   createZeroVector,
 } from '../../src/modules/indexation/embeddingService.js';
+import { stopPeriodicCleanup } from '../../src/modules/indexation/embeddingCache.js';
 
 describe('Vector Store - Utilities', () => {
+  afterEach(() => {
+    // Arrêter le nettoyage périodique après chaque test
+    stopPeriodicCleanup();
+  });
+
   describe('getEmbeddingDimension', () => {
     test('should return the correct dimension', () => {
       const dimension = getEmbeddingDimension();

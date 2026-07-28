@@ -9,11 +9,17 @@ import {
   getEmbeddingDimension,
   createZeroVector,
 } from '../../src/modules/indexation/embeddingService.js';
+import { stopPeriodicCleanup } from '../../src/modules/indexation/embeddingCache.js';
 
 // Augmenter le timeout pour les tests de performance
 jest.setTimeout(30000);
 
 describe('Performance - Embedding Service', () => {
+  afterEach(() => {
+    // Arrêter le nettoyage périodique après chaque test
+    stopPeriodicCleanup();
+  });
+
   describe('cosineSimilarity', () => {
     test('should calculate similarity quickly for small vectors', () => {
       const vectorA = new Array(384).fill(0.5);

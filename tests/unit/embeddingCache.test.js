@@ -10,12 +10,18 @@ import {
   clearCache,
   getCacheStats,
   cleanupCache,
+  stopPeriodicCleanup,
 } from '../../src/modules/indexation/embeddingCache.js';
 
 describe('Embedding Cache', () => {
   beforeEach(() => {
     // Réinitialiser le cache avant chaque test
     clearCache();
+  });
+
+  afterEach(() => {
+    // Arrêter le nettoyage périodique après chaque test
+    stopPeriodicCleanup();
   });
 
   describe('storeEmbeddingInCache et getEmbeddingFromCache', () => {

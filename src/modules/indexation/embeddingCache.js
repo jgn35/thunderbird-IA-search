@@ -32,6 +32,12 @@ const embeddingCache = new Map();
 const errorCache = new Map();
 
 /**
+ * Timer pour le nettoyage périodique
+ * @type {NodeJS.Timeout|null}
+ */
+let cleanupTimer = null;
+
+/**
  * Génère une clé de cache pour un texte
  * @param {string} text - Texte à hacher
  * @returns {string} Clé de cache
@@ -198,17 +204,30 @@ export function getCacheStats() {
  * @param {number} [interval=3600000] - Intervalle de nettoyage (en ms, par défaut 1 heure)
  */
 export function startPeriodicCleanup(interval = 3600000) {
+  // Arrêter le nettoyage périodique existant s'il y en a un
+  stopPeriodicCleanup();
+  
   // Nettoyer immédiatement
   cleanupCache();
   
   // Nettoyer périodiquement
-  setInterval(() => {
+  cleanupTimer = setInterval(() => {
     try {
       cleanupCache();
     } catch (error) {
       logError(error, 'Nettoyage périodique du cache');
     }
   }, interval);
+}
+
+/**
+ * Arrête le nettoyage périodique du cache
+ */
+export function stopPeriodicCleanup() {
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+    cleanupTimer = null;
+  }
 }
 
 // Démarrer le nettoyage périodique

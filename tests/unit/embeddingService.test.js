@@ -8,8 +8,14 @@ import {
   getEmbeddingDimension,
   createZeroVector,
 } from '../../src/modules/indexation/embeddingService.js';
+import { stopPeriodicCleanup } from '../../src/modules/indexation/embeddingCache.js';
 
 describe('Embedding Service', () => {
+  afterEach(() => {
+    // Arrêter le nettoyage périodique après chaque test
+    stopPeriodicCleanup();
+  });
+
   describe('cosineSimilarity', () => {
     test('should return 1 for identical vectors', () => {
       const vectorA = [1, 2, 3];
