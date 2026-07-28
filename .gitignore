@@ -30,3 +30,6 @@ coverage/
 # Temporary files
 tmp/
 temp/
+
+# npm lockfile (use yarn.lock instead)
+package-lock.json
