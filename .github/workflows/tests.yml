@@ -20,23 +20,23 @@ jobs:
         node-version: '20'
         cache: 'yarn'
 
-    - name: Installation des dpendances
+    - name: Installation des dependances
       run: |
         yarn install --frozen-lockfile
 
-    - name: Excution des tests unitaires
+    - name: Execution des tests unitaires
       run: |
         yarn test
 
-    - name: Excution des tests d'intgration
+    - name: Execution des tests d'integration
       run: |
-        yarn test tests/integration/ || echo "Tests d'intgration chous (attendu en environnement Node.js)"
+        yarn test tests/integration/ || echo "Tests d'integration echoues (attendu en environnement Node.js)"
 
-    - name: Excution des tests de performance
+    - name: Execution des tests de performance
       run: |
-        yarn test tests/performance/ || echo "Tests de performance chous (attendu en environnement Node.js)"
+        yarn test tests/performance/ || echo "Tests de performance echoues (attendu en environnement Node.js)"
 
-    - name: Vrification de la couverture de code
+    - name: Verification de la couverture de code
       run: |
         yarn test:coverage
 
@@ -53,10 +53,10 @@ jobs:
         node-version: '20'
         cache: 'yarn'
 
-    - name: Installation des dpendances
+    - name: Installation des dependances
       run: |
         yarn install --frozen-lockfile
 
-    - name: Excution du linting
+    - name: Execution du linting
       run: |
         yarn lint || echo "Linting not configured yet"
