@@ -1,0 +1,50 @@
+name: Build XPI
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Installation des dépendances
+        run: |
+          npm install
+
+      - name: Build de l'extension
+        run: |
+          npx web-ext build
+
+      - name: Renommer le fichier en .xpi
+        run: |
+          mv web-ext-artifacts/*.zip web-ext-artifacts/thunderbird_rag_search-1.0.0.xpi
+
+      - name: Télécharger l'artefact XPI
+        uses: actions/upload-artifact@v4
+        with:
+          name: thunderbird-rag-search-xpi
+          path: web-ext-artifacts/thunderbird_rag_search-1.0.0.xpi
+          retention-days: 30
+
+      - name: Publier l'artefact dans la release (si release)
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: web-ext-artifacts/thunderbird_rag_search-1.0.0.xpi
+          asset_name: thunderbird_rag_search-1.0.0.xpi
+          asset_content_type: application/x-xpinstall
