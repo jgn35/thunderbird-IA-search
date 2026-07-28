@@ -17,7 +17,7 @@ jobs:
     - name: Configuration de Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '24'
         cache: 'yarn'
 
     - name: Installation des dependances
@@ -50,7 +50,7 @@ jobs:
     - name: Configuration de Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '24'
         cache: 'yarn'
 
     - name: Installation des dependances
