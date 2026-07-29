@@ -54,6 +54,9 @@ async function init() {
     // Charger la configuration dans l'interface
     loadConfigToUI();
     
+    // Initialiser l'onglet actif
+    updateLLMConfigSections(appState.config.rag?.type || 'api_externe');
+    
     console.log('Page des options RAG Search initialisée avec succès');
   } catch (error) {
     console.error('Erreur lors de l\'initialisation:', error);
@@ -277,6 +280,17 @@ function switchTab(tabName) {
   document.querySelectorAll('.tab-pane').forEach(pane => {
     pane.classList.toggle('active', pane.id === tabName);
   });
+  
+  // Recharger la configuration pour l'onglet actif
+  loadConfigToUI();
+  
+  // Mettre à jour les sections LLM si on est sur l'onglet RAG
+  if (tabName === 'rag') {
+    const llmTypeSelect = document.getElementById('configLLMType');
+    if (llmTypeSelect) {
+      updateLLMConfigSections(llmTypeSelect.value);
+    }
+  }
 }
 
 /**
@@ -384,7 +398,6 @@ function loadConfigToUI() {
   const llmTypeSelect = document.getElementById('configLLMType');
   if (llmTypeSelect) {
     llmTypeSelect.value = config.rag?.type || 'api_externe';
-    updateLLMConfigSections(llmTypeSelect.value);
   }
   
   // API Externe
@@ -444,6 +457,11 @@ function loadConfigToUI() {
   const enableDebugLogsCheckbox = document.getElementById('enableDebugLogs');
   if (enableDebugLogsCheckbox) {
     enableDebugLogsCheckbox.checked = config.debug?.enableDebugLogs || false;
+  }
+  
+  // Mettre à jour les sections LLM en fonction du type sélectionné
+  if (llmTypeSelect) {
+    updateLLMConfigSections(llmTypeSelect.value);
   }
 }
 
