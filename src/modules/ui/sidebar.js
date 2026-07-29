@@ -55,7 +55,7 @@ async function init() {
     // Charger la configuration
     await loadConfig();
     
-    // Charger les comptes et dossiers
+    // Charger les comptes et dossiers via le background script
     await loadAccountsAndFolders();
     
     // Mettre à jour les statistiques de l'index
@@ -91,37 +91,39 @@ async function loadConfig() {
 }
 
 /**
- * Charge les comptes et dossiers
+ * Charge les comptes et dossiers via le background script
  */
 async function loadAccountsAndFolders() {
   try {
-    // Récupérer les comptes
-    const accounts = await browser.accounts.list();
-    appState.accounts = accounts;
+    showLoading('Chargement des comptes et dossiers...');
     
-    // Récupérer tous les dossiers
-    let allFolders = [];
-    for (const account of accounts) {
-      const folders = await browser.folders.list(account.id);
-      allFolders = allFolders.concat(folders);
+    // Envoyer un message au background script pour récupérer les comptes et dossiers
+    const response = await browser.runtime.sendMessage({ type: 'GET_ACCOUNTS_AND_FOLDERS' });
+    
+    if (response && response.success) {
+      appState.accounts = response.accounts || [];
+      appState.allFolders = response.folders || [];
+      
+      // Mettre à jour la liste des dossiers dans l'interface
+      updateFoldersList();
+      
+      // Charger les dossiers sélectionnés depuis la configuration
+      const config = await getConfig();
+      const selectedFolders = config.selectedFolders || [];
+      appState.selectedFolders = selectedFolders;
+      
+      // Sélectionner les dossiers dans l'interface
+      updateSelectedFoldersInUI();
+    } else {
+      console.error('Erreur lors de la récupération des comptes/dossiers:', response?.error);
+      showNotification('Erreur lors du chargement des dossiers', 'error');
     }
-    
-    appState.allFolders = allFolders;
-    
-    // Mettre à jour la liste des dossiers dans l'interface
-    updateFoldersList();
-    
-    // Charger les dossiers sélectionnés depuis la configuration
-    const config = await getConfig();
-    const selectedFolders = config.selectedFolders || [];
-    appState.selectedFolders = selectedFolders;
-    
-    // Sélectionner les dossiers dans l'interface
-    updateSelectedFoldersInUI();
     
   } catch (error) {
     console.error('Erreur lors du chargement des comptes/dossiers:', error);
     showNotification('Erreur lors du chargement des dossiers', 'error');
+  } finally {
+    hideLoading();
   }
 }
 
@@ -134,6 +136,16 @@ function updateFoldersList() {
 
   // Vider la liste
   selectElement.innerHTML = '';
+  
+  // Vérifier s'il y a des dossiers
+  if (!appState.allFolders || appState.allFolders.length === 0) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Aucun dossier disponible';
+    option.disabled = true;
+    selectElement.appendChild(option);
+    return;
+  }
   
   // Ajouter les dossiers
   appState.allFolders.forEach(folder => {
@@ -255,11 +267,11 @@ function setupEventListeners() {
   }
 
   // Type de LLM
-  const llmTypeSelect = document.getElementById('configLLMType');
+  const llmTypeSelect = document.getElementById('llmTypeSelect');
   if (llmTypeSelect) {
     llmTypeSelect.addEventListener('change', (e) => {
       const llmType = e.target.value;
-      updateLLMConfigSections(llmType);
+      setLLMType(llmType);
     });
   }
 
@@ -293,15 +305,6 @@ function setupEventListeners() {
       if (query.length >= 2) {
         await showSearchSuggestions(query);
       }
-    });
-  }
-
-  // Type de LLM dans la recherche
-  const llmTypeSelectInSearch = document.getElementById('llmTypeSelect');
-  if (llmTypeSelectInSearch) {
-    llmTypeSelectInSearch.addEventListener('change', (e) => {
-      const llmType = e.target.value;
-      setLLMType(llmType);
     });
   }
 }
@@ -566,176 +569,20 @@ function loadConfigToUI() {
   if (maxEmailSizeInput) {
     maxEmailSizeInput.value = (config.indexation?.maxEmailSize || 10485760) / (1024 * 1024); // Convertir en Mo
   }
+
+  // Dossiers sélectionnés
+  updateSelectedFoldersInUI();
   
   // RAG
-  const llmTypeSelect = document.getElementById('configLLMType');
-  if (llmTypeSelect) {
-    llmTypeSelect.value = config.rag?.type || 'api_externe';
-    updateLLMConfigSections(llmTypeSelect.value);
+  const llmTypeSelectInSearch = document.getElementById('llmTypeSelect');
+  if (llmTypeSelectInSearch) {
+    llmTypeSelectInSearch.value = config.rag?.type || 'api_externe';
   }
   
-  // API Externe
-  const apiEndpointInput = document.getElementById('apiEndpoint');
-  if (apiEndpointInput && config.rag?.api?.endpoint) {
-    apiEndpointInput.value = config.rag.api.endpoint;
-  }
-  
-  const apiKeyInput = document.getElementById('apiKey');
-  if (apiKeyInput && config.rag?.api?.apiKey) {
-    apiKeyInput.value = config.rag.api.apiKey;
-  }
-  
-  const apiModelSelect = document.getElementById('apiModel');
-  if (apiModelSelect && config.rag?.api?.model) {
-    apiModelSelect.value = config.rag.api.model;
-  }
-  
-  // Ollama
-  const ollamaUrlInput = document.getElementById('ollamaUrl');
-  if (ollamaUrlInput && config.rag?.local?.url) {
-    ollamaUrlInput.value = config.rag.local.url;
-  }
-  
-  const ollamaModelInput = document.getElementById('ollamaModel');
-  if (ollamaModelInput && config.rag?.local?.model) {
-    ollamaModelInput.value = config.rag.local.model;
-  }
-}
-
-/**
- * Met à jour les sections de configuration LLM
- * @param {string} llmType - Type de LLM
- */
-function updateLLMConfigSections(llmType) {
-  const apiConfigSection = document.getElementById('apiConfigSection');
-  const ollamaConfigSection = document.getElementById('ollamaConfigSection');
-  
-  if (apiConfigSection && ollamaConfigSection) {
-    if (llmType === 'api_externe') {
-      apiConfigSection.style.display = 'block';
-      ollamaConfigSection.style.display = 'none';
-    } else {
-      apiConfigSection.style.display = 'none';
-      ollamaConfigSection.style.display = 'block';
-    }
-  }
-}
-
-/**
- * Sauvegarde la configuration
- */
-async function saveConfiguration() {
-  try {
-    const config = {};
-    
-    // Indexation
-    const excludedFoldersInput = document.getElementById('excludedFolders');
-    if (excludedFoldersInput) {
-      const excludedFolders = excludedFoldersInput.value
-        .split(',')
-        .map(f => f.trim())
-        .filter(f => f);
-      
-      config.indexation = {
-        ...config.indexation,
-        excludedFolders,
-      };
-    }
-    
-    const indexAttachmentsCheckbox = document.getElementById('indexAttachments');
-    if (indexAttachmentsCheckbox) {
-      config.indexation = {
-        ...config.indexation,
-        indexAttachments: indexAttachmentsCheckbox.checked,
-      };
-    }
-    
-    const maxEmailSizeInput = document.getElementById('maxEmailSize');
-    if (maxEmailSizeInput) {
-      const maxEmailSize = parseInt(maxEmailSizeInput.value) * 1024 * 1024; // Convertir en octets
-      config.indexation = {
-        ...config.indexation,
-        maxEmailSize,
-      };
-    }
-    
-    // Dossiers sélectionnés
-    const selectedFoldersSelect = document.getElementById('selectedFolders');
-    if (selectedFoldersSelect) {
-      const selectedOptions = Array.from(selectedFoldersSelect.selectedOptions);
-      config.selectedFolders = selectedOptions.map(option => option.value);
-      appState.selectedFolders = config.selectedFolders;
-    }
-    
-    // RAG
-    const llmTypeSelect = document.getElementById('configLLMType');
-    if (llmTypeSelect) {
-      config.rag = {
-        ...config.rag,
-        type: llmTypeSelect.value,
-      };
-    }
-    
-    // API Externe
-    const apiEndpointInput = document.getElementById('apiEndpoint');
-    const apiKeyInput = document.getElementById('apiKey');
-    const apiModelSelect = document.getElementById('apiModel');
-    
-    if (apiEndpointInput || apiKeyInput || apiModelSelect) {
-      config.rag = {
-        ...config.rag,
-        api: {
-          endpoint: apiEndpointInput?.value || '',
-          apiKey: apiKeyInput?.value || '',
-          model: apiModelSelect?.value || 'mistral-tiny',
-        },
-      };
-    }
-    
-    // Ollama
-    const ollamaUrlInput = document.getElementById('ollamaUrl');
-    const ollamaModelInput = document.getElementById('ollamaModel');
-    
-    if (ollamaUrlInput || ollamaModelInput) {
-      config.rag = {
-        ...config.rag,
-        local: {
-          url: ollamaUrlInput?.value || '',
-          model: ollamaModelInput?.value || 'mistral-7b',
-        },
-      };
-    }
-    
-    // Sauvegarder la configuration
-    await saveConfig(config);
-    appState.config = config;
-    
-    showNotification('Configuration sauvegardée avec succès', 'success');
-    
-    // Vérifier la configuration RAG
-    await checkAndUpdateRAGStatus();
-    
-  } catch (error) {
-    console.error('Erreur lors de la sauvegarde de la configuration:', error);
-    showNotification('Erreur lors de la sauvegarde de la configuration', 'error');
-  }
-}
-
-/**
- * Réinitialise la configuration
- */
-async function resetConfiguration() {
-  if (confirm('Êtes-vous sûr de vouloir réinitialiser la configuration aux valeurs par défaut ?')) {
-    try {
-      await resetConfig();
-      await loadConfig();
-      updateUIFromConfig();
-      loadConfigToUI();
-      showNotification('Configuration réinitialisée', 'success');
-    } catch (error) {
-      console.error('Erreur lors de la réinitialisation:', error);
-      showNotification('Erreur lors de la réinitialisation', 'error');
-    }
+  // Cochez la case RAG par défaut
+  const useRAGCheckbox = document.getElementById('useRAGCheckbox');
+  if (useRAGCheckbox) {
+    useRAGCheckbox.checked = true;
   }
 }
 
@@ -868,6 +715,124 @@ async function exportLogs() {
   } catch (error) {
     console.error('Erreur lors de l\'export des logs:', error);
     showNotification('Erreur lors de l\'export des logs', 'error');
+  }
+}
+
+/**
+ * Sauvegarde la configuration
+ */
+async function saveConfiguration() {
+  try {
+    const config = {};
+    
+    // Indexation
+    const excludedFoldersInput = document.getElementById('excludedFolders');
+    if (excludedFoldersInput) {
+      const excludedFolders = excludedFoldersInput.value
+        .split(',')
+        .map(f => f.trim())
+        .filter(f => f);
+      
+      config.indexation = {
+        ...config.indexation,
+        excludedFolders,
+      };
+    }
+    
+    const indexAttachmentsCheckbox = document.getElementById('indexAttachments');
+    if (indexAttachmentsCheckbox) {
+      config.indexation = {
+        ...config.indexation,
+        indexAttachments: indexAttachmentsCheckbox.checked,
+      };
+    }
+    
+    const maxEmailSizeInput = document.getElementById('maxEmailSize');
+    if (maxEmailSizeInput) {
+      const maxEmailSize = parseInt(maxEmailSizeInput.value) * 1024 * 1024; // Convertir en octets
+      config.indexation = {
+        ...config.indexation,
+        maxEmailSize,
+      };
+    }
+    
+    // Dossiers sélectionnés
+    const selectedFoldersSelect = document.getElementById('selectedFolders');
+    if (selectedFoldersSelect) {
+      const selectedOptions = Array.from(selectedFoldersSelect.selectedOptions);
+      config.selectedFolders = selectedOptions.map(option => option.value);
+      appState.selectedFolders = config.selectedFolders;
+    }
+    
+    // RAG
+    const llmTypeSelect = document.getElementById('configLLMType');
+    if (llmTypeSelect) {
+      config.rag = {
+        ...config.rag,
+        type: llmTypeSelect.value,
+      };
+    }
+    
+    // API Externe
+    const apiEndpointInput = document.getElementById('apiEndpoint');
+    const apiKeyInput = document.getElementById('apiKey');
+    const apiModelSelect = document.getElementById('apiModel');
+    
+    if (apiEndpointInput || apiKeyInput || apiModelSelect) {
+      config.rag = {
+        ...config.rag,
+        api: {
+          endpoint: apiEndpointInput?.value || '',
+          apiKey: apiKeyInput?.value || '',
+          model: apiModelSelect?.value || 'mistral-tiny',
+        },
+      };
+    }
+    
+    // Ollama
+    const ollamaUrlInput = document.getElementById('ollamaUrl');
+    const ollamaModelInput = document.getElementById('ollamaModel');
+    
+    if (ollamaUrlInput || ollamaModelInput) {
+      config.rag = {
+        ...config.rag,
+        local: {
+          url: ollamaUrlInput?.value || '',
+          model: ollamaModelInput?.value || 'mistral-7b',
+        },
+      };
+    }
+    
+    // Sauvegarder la configuration
+    await saveConfig(config);
+    appState.config = config;
+    
+    showNotification('Configuration sauvegardée avec succès', 'success');
+    
+    // Vérifier la configuration RAG
+    await checkAndUpdateRAGStatus();
+    
+  } catch (error) {
+    console.error('Erreur lors de la sauvegarde de la configuration:', error);
+    showNotification('Erreur lors de la sauvegarde de la configuration', 'error');
+  }
+}
+
+/**
+ * Réinitialise la configuration
+ */
+async function resetConfiguration() {
+  if (confirm('Êtes-vous sûr de vouloir réinitialiser la configuration aux valeurs par défaut ?')) {
+    try {
+      await resetConfig();
+      await loadConfig();
+      updateUIFromConfig();
+      loadConfigToUI();
+      showNotification('Configuration réinitialisée', 'success');
+    } catch (error) {
+      console.error('Erreur lors de la réinitialisation:', error);
+      showNotification('Erreur lors de la réinitialisation', 'error');
+    }
   }
 }
 

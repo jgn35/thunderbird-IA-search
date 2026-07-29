@@ -110,6 +110,11 @@ async function handleMessage(message, sender, sendResponse) {
         const config = await getConfig();
         sendResponse({ success: true, config });
         break;
+
+      case 'GET_ACCOUNTS_AND_FOLDERS':
+        const accountsAndFolders = await getAccountsAndFolders();
+        sendResponse({ success: true, ...accountsAndFolders });
+        break;
         
       default:
         await logWarn(`Type de message inconnu : ${message.type}`);
@@ -118,6 +123,37 @@ async function handleMessage(message, sender, sendResponse) {
   } catch (error) {
     await logError(error, `Traitement du message : ${message.type}`);
     sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Récupère les comptes et dossiers
+ * @returns {Promise<Object>} Objet contenant les comptes et dossiers
+ */
+async function getAccountsAndFolders() {
+  try {
+    await logInfo('Récupération des comptes et dossiers');
+    
+    // Récupérer les comptes
+    const accounts = await browser.accounts.list();
+    
+    // Récupérer tous les dossiers pour chaque compte
+    let allFolders = [];
+    for (const account of accounts) {
+      try {
+        const folders = await browser.folders.list(account.id);
+        allFolders = allFolders.concat(folders);
+      } catch (error) {
+        await logError(error, `Erreur lors de la récupération des dossiers pour le compte ${account.id}`);
+      }
+    }
+    
+    await logInfo(`Trouvé ${accounts.length} comptes et ${allFolders.length} dossiers`);
+    
+    return { accounts, folders: allFolders };
+  } catch (error) {
+    await logError(error, 'Récupération des comptes et dossiers');
+    return { accounts: [], folders: [] };
   }
 }
 

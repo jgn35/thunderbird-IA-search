@@ -42,7 +42,7 @@ async function init() {
     // Charger la configuration
     await loadConfig();
     
-    // Charger les comptes et dossiers
+    // Charger les comptes et dossiers via le background script
     await loadAccountsAndFolders();
     
     // Mettre à jour les statistiques de l'index
@@ -81,37 +81,39 @@ async function loadConfig() {
 }
 
 /**
- * Charge les comptes et dossiers
+ * Charge les comptes et dossiers via le background script
  */
 async function loadAccountsAndFolders() {
   try {
-    // Récupérer les comptes
-    const accounts = await browser.accounts.list();
-    appState.accounts = accounts;
+    showLoading('Chargement des comptes et dossiers...');
     
-    // Récupérer tous les dossiers
-    let allFolders = [];
-    for (const account of accounts) {
-      const folders = await browser.folders.list(account.id);
-      allFolders = allFolders.concat(folders);
+    // Envoyer un message au background script pour récupérer les comptes et dossiers
+    const response = await browser.runtime.sendMessage({ type: 'GET_ACCOUNTS_AND_FOLDERS' });
+    
+    if (response && response.success) {
+      appState.accounts = response.accounts || [];
+      appState.allFolders = response.folders || [];
+      
+      // Mettre à jour la liste des dossiers dans l'interface
+      updateFoldersList();
+      
+      // Charger les dossiers sélectionnés depuis la configuration
+      const config = await getConfig();
+      const selectedFolders = config.selectedFolders || [];
+      appState.selectedFolders = selectedFolders;
+      
+      // Sélectionner les dossiers dans l'interface
+      updateSelectedFoldersInUI();
+    } else {
+      console.error('Erreur lors de la récupération des comptes/dossiers:', response?.error);
+      showNotification('Erreur lors du chargement des dossiers', 'error');
     }
-    
-    appState.allFolders = allFolders;
-    
-    // Mettre à jour la liste des dossiers dans l'interface
-    updateFoldersList();
-    
-    // Charger les dossiers sélectionnés depuis la configuration
-    const config = await getConfig();
-    const selectedFolders = config.selectedFolders || [];
-    appState.selectedFolders = selectedFolders;
-    
-    // Sélectionner les dossiers dans l'interface
-    updateSelectedFoldersInUI();
     
   } catch (error) {
     console.error('Erreur lors du chargement des comptes/dossiers:', error);
     showNotification('Erreur lors du chargement des dossiers', 'error');
+  } finally {
+    hideLoading();
   }
 }
 
@@ -124,6 +126,16 @@ function updateFoldersList() {
 
   // Vider la liste
   selectElement.innerHTML = '';
+  
+  // Vérifier s'il y a des dossiers
+  if (!appState.allFolders || appState.allFolders.length === 0) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Aucun dossier disponible';
+    option.disabled = true;
+    selectElement.appendChild(option);
+    return;
+  }
   
   // Ajouter les dossiers
   appState.allFolders.forEach(folder => {
