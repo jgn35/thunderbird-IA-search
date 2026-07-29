@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG Search - Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="options-container">
+    <!-- En-tête -->
+    <div class="options-header">
+      <h1>RAG Search - Configuration</h1>
+      <p class="subtitle">Configurez l'indexation et le RAG pour vos emails</p>
+    </div>
+
+    <!-- Onglets -->
+    <div class="tabs">
+      <button class="tab-button active" data-tab="indexation">Indexation</button>
+      <button class="tab-button" data-tab="rag">RAG</button>
+      <button class="tab-button" data-tab="advanced">Avancé</button>
+    </div>
+
+    <!-- Contenu des onglets -->
+    <div class="tab-content">
+      <!-- Onglet Indexation -->
+      <div id="indexation" class="tab-pane active">
+        <div class="config-section">
+          <h3>Dossiers à indexer</h3>
+          
+          <div class="config-group">
+            <label for="selectedFolders">Sélectionnez les dossiers à indexer :</label>
+            <select id="selectedFolders" multiple size="8">
+              <!-- Les dossiers seront chargés dynamiquement -->
+            </select>
+            <small>Maintenez Ctrl/Cmd pour sélectionner plusieurs dossiers</small>
+          </div>
+
+          <div class="config-group">
+            <label for="excludedFolders">Dossiers exclus :</label>
+            <input 
+              type="text" 
+              id="excludedFolders" 
+              placeholder="Spam, Trash, ..."
+            >
+            <small>Séparés par des virgules</small>
+          </div>
+
+          <div class="config-group">
+            <label>
+              <input type="checkbox" id="indexAttachments"> 
+              Indexer les pièces jointes
+            </label>
+            <small>Cela peut augmenter la taille de l'index et le temps d'indexation</small>
+          </div>
+
+          <div class="config-group">
+            <label for="maxEmailSize">Taille maximale des emails (Mo) :</label>
+            <input 
+              type="number" 
+              id="maxEmailSize" 
+              min="1" 
+              max="100" 
+              value="10"
+            >
+            <small>Les emails plus grands seront ignorés</small>
+          </div>
+
+          <div class="actions">
+            <button id="refreshFoldersButton" class="btn btn-small">
+              Rafraîchir la liste des dossiers
+            </button>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <h3>Actions d'indexation</h3>
+          <div class="indexation-actions">
+            <button id="indexAllButton" class="btn btn-primary">
+              Indexer tous les emails
+            </button>
+            <button id="indexModifiedButton" class="btn btn-secondary">
+              Indexer les emails modifiés
+            </button>
+            <button id="clearIndexButton" class="btn btn-danger">
+              Vider l'index
+            </button>
+          </div>
+          
+          <div class="indexation-status">
+            <div class="status-item">
+              <span class="status-label">Emails indexés :</span>
+              <span id="indexedCount">0</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Dernière indexation :</span>
+              <span id="lastIndexation">Jamais</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Onglet RAG -->
+      <div id="rag" class="tab-pane">
+        <div class="config-section">
+          <h3>Configuration du LLM</h3>
+          
+          <div class="config-group">
+            <label>Type de LLM :</label>
+            <select id="configLLMType">
+              <option value="api_externe">API Externe (Mistral AI)</option>
+              <option value="local">Local (Ollama)</option>
+            </select>
+          </div>
+
+          <!-- Configuration API Externe -->
+          <div id="apiConfigSection" class="llm-config-section">
+            <h4>API Externe (Mistral AI)</h4>
+            
+            <div class="config-group">
+              <label for="apiEndpoint">Endpoint :</label>
+              <input 
+                type="text" 
+                id="apiEndpoint" 
+                placeholder="https://api.mistral.ai/v1"
+              >
+            </div>
+
+            <div class="config-group">
+              <label for="apiKey">Clé API :</label>
+              <input 
+                type="password" 
+                id="apiKey" 
+                placeholder="Votre clé API Mistral"
+              >
+              <small>Obtenez une clé API sur <a href="https://console.mistral.ai/" target="_blank">console.mistral.ai</a></small>
+            </div>
+
+            <div class="config-group">
+              <label for="apiModel">Modèle :</label>
+              <select id="apiModel">
+                <option value="mistral-tiny">mistral-tiny</option>
+                <option value="mistral-small">mistral-small</option>
+                <option value="mistral-medium">mistral-medium</option>
+                <option value="mistral-large">mistral-large</option>
+              </select>
+            </div>
+
+            <div class="config-group">
+              <label for="embeddingEndpoint">Endpoint Embeddings :</label>
+              <input 
+                type="text" 
+                id="embeddingEndpoint" 
+                placeholder="https://api.mistral.ai/v1/embeddings"
+              >
+            </div>
+          </div>
+
+          <!-- Configuration Ollama -->
+          <div id="ollamaConfigSection" class="llm-config-section" style="display: none;">
+            <h4>Local (Ollama)</h4>
+            
+            <div class="config-group">
+              <label for="ollamaUrl">URL du serveur :</label>
+              <input 
+                type="text" 
+                id="ollamaUrl" 
+                placeholder="http://localhost:11434"
+              >
+            </div>
+
+            <div class="config-group">
+              <label for="ollamaModel">Modèle :</label>
+              <input 
+                type="text" 
+                id="ollamaModel" 
+                placeholder="mistral-7b"
+              >
+            </div>
+
+            <div class="config-group">
+              <button id="checkOllamaStatus" class="btn btn-small">
+                Vérifier le statut
+              </button>
+              <span id="ollamaStatus"></span>
+            </div>
+
+            <div class="config-group">
+              <small>
+                <p>Pour utiliser Ollama :</p>
+                <ol>
+                  <li>Installez Ollama depuis <a href="https://ollama.ai/" target="_blank">ollama.ai</a></li>
+                  <li>Démarrez le serveur : <code>ollama serve</code></li>
+                  <li>Téléchargez un modèle : <code>ollama pull mistral-7b</code></li>
+                </ol>
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <h3>Paramètres RAG</h3>
+          
+          <div class="config-group">
+            <label for="ragTopK">Nombre de résultats à retourner (Top K) :</label>
+            <input 
+              type="number" 
+              id="ragTopK" 
+              min="1" 
+              max="20" 
+              value="5"
+            >
+            <small>Nombre d'emails à utiliser comme contexte pour la réponse</small>
+          </div>
+
+          <div class="config-group">
+            <label for="ragTemperature">Température :</label>
+            <input 
+              type="number" 
+              id="ragTemperature" 
+              min="0" 
+              max="2" 
+              step="0.1" 
+              value="0.7"
+            >
+            <small>Contrôle la créativité (0 = déterministe, 2 = très créatif)</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Onglet Avancé -->
+      <div id="advanced" class="tab-pane">
+        <div class="config-section">
+          <h3>Paramètres avancés</h3>
+          
+          <div class="config-group">
+            <label for="chunkSize">Taille des chunks (tokens) :</label>
+            <input 
+              type="number" 
+              id="chunkSize" 
+              min="100" 
+              max="4096" 
+              value="512"
+            >
+            <small>Taille des segments pour l'indexation</small>
+          </div>
+
+          <div class="config-group">
+            <label for="chunkOverlap">Recouvrement des chunks (tokens) :</label>
+            <input 
+              type="number" 
+              id="chunkOverlap" 
+              min="0" 
+              max="1000" 
+              value="100"
+            >
+            <small>Nombre de tokens de recouvrement entre les chunks</small>
+          </div>
+
+          <div class="config-group">
+            <label>
+              <input type="checkbox" id="enableDebugLogs"> 
+              Activer les logs de débogage
+            </label>
+            <small>Cela peut générer beaucoup de logs</small>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <h3>Gestion des données</h3>
+          
+          <div class="config-group">
+            <button id="exportConfigButton" class="btn btn-small">
+              Exporter la configuration
+            </button>
+            <button id="importConfigButton" class="btn btn-small">
+              Importer la configuration
+            </button>
+          </div>
+
+          <div class="config-group">
+            <button id="resetConfigButton" class="btn btn-danger">
+              Réinitialiser la configuration
+            </button>
+            <small>Cela réinitialisera tous les paramètres aux valeurs par défaut</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="options-actions">
+      <button id="saveConfigButton" class="btn btn-primary">
+        Sauvegarder la configuration
+      </button>
+      <button id="cancelButton" class="btn btn-secondary">
+        Annuler
+      </button>
+    </div>
+
+    <!-- Indicateur de chargement -->
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+      <div class="spinner"></div>
+      <span id="loadingText">Chargement...</span>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notificationContainer" class="notification-container"></div>
+  </div>
+
+  <script src="options.js" type="module"></script>
+</body>
+</html>
