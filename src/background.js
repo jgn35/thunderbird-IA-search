@@ -15,27 +15,13 @@ import {
 
 /**
  * Vérifie si l'API Thunderbird messenger est disponible
- * Dans Thunderbird, on utilise browser.messenger ou browser (selon la version)
  * @returns {boolean}
  */
 function isMessengerAPIAvailable() {
-  // Vérifier browser.messenger (API moderne)
-  if (typeof browser !== 'undefined' && 
-      browser && 
-      browser.messenger && 
-      typeof browser.messenger === 'object') {
-    return true;
-  }
-  
-  // Vérifier browser directement (certaines versions de Thunderbird)
-  if (typeof browser !== 'undefined' && 
-      browser && 
-      browser.accounts && 
-      browser.folders) {
-    return true;
-  }
-  
-  return false;
+  return typeof browser !== 'undefined' && 
+         browser && 
+         browser.messenger && 
+         typeof browser.messenger === 'object';
 }
 
 /**
@@ -64,19 +50,21 @@ async function getAccounts() {
 
 /**
  * Récupère les dossiers pour un compte
+ * Dans Thunderbird, on utilise browser.folders.query() et non list()
  * @param {string} accountId - ID du compte
  * @returns {Promise<Array>}
  */
 async function getFoldersForAccount(accountId) {
   try {
-    // Essayer browser.messenger.folders (API moderne)
+    // Essayer browser.messenger.folders.query (API moderne)
     if (browser.messenger && browser.messenger.folders) {
-      return await browser.messenger.folders.list(accountId);
+      // Utiliser query() au lieu de list() - voir documentation Thunderbird
+      return await browser.messenger.folders.query({ accountId: accountId });
     }
     
-    // Essayer browser.folders (API alternative)
+    // Essayer browser.folders.query (API standard)
     if (browser.folders) {
-      return await browser.folders.list(accountId);
+      return await browser.folders.query({ accountId: accountId });
     }
     
     await logWarn(`Aucune API de dossiers disponible pour le compte ${accountId}`);
@@ -84,6 +72,26 @@ async function getFoldersForAccount(accountId) {
   } catch (error) {
     await logError(error, `Récupération des dossiers pour le compte ${accountId}`);
     return [];
+  }
+}
+
+/**
+ * Récupère un email complet
+ * @param {string} messageId - ID de l'email
+ * @returns {Promise<Object|null>}
+ */
+async function getFullEmail(messageId) {
+  try {
+    if (browser.messenger && browser.messenger.messages) {
+      return await browser.messenger.messages.getFull(messageId);
+    }
+    if (browser.messages) {
+      return await browser.messages.getFull(messageId);
+    }
+    return null;
+  } catch (error) {
+    await logError(error, `Récupération de l'email ${messageId}`);
+    return null;
   }
 }
 
@@ -287,26 +295,6 @@ async function handleMessageCreated(message) {
     }
   } catch (error) {
     await logError(error, `Traitement de la création de l'email : ${message.id}`);
-  }
-}
-
-/**
- * Récupère un email complet
- * @param {string} messageId - ID de l'email
- * @returns {Promise<Object|null>}
- */
-async function getFullEmail(messageId) {
-  try {
-    if (browser.messenger && browser.messenger.messages) {
-      return await browser.messenger.messages.getFull(messageId);
-    }
-    if (browser.messages) {
-      return await browser.messages.getFull(messageId);
-    }
-    return null;
-  } catch (error) {
-    await logError(error, `Récupération de l'email ${messageId}`);
-    return null;
   }
 }
 
