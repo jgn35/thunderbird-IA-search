@@ -33,63 +33,44 @@ function getMessengerAPI() {
 }
 
 /**
- * Récupère les comptes via l'API Thunderbird
- * @returns {Promise<Array>}
+ * Gère une requête messenger directement
+ * @param {string} type - Type de l'opération
+ * @param {Object} data - Données à transmettre
+ * @returns {Promise<any>} Résultat de l'opération
  */
-async function getAccounts() {
-  try {
-    const messengerAPI = getMessengerAPI();
-    
-    if (messengerAPI && messengerAPI.accounts) {
-      return await messengerAPI.accounts.list();
-    }
-    
-    throw new Error('Aucune API de comptes disponible');
-  } catch (error) {
-    await logError(error, 'Récupération des comptes');
-    return [];
+async function handleMessengerRequest(type, data = {}) {
+  const messengerAPI = getMessengerAPI();
+  
+  if (!messengerAPI) {
+    throw new Error('Aucune API messenger disponible');
   }
-}
-
-/**
- * Récupère les dossiers pour un compte
- * Dans Thunderbird, on utilise folders.query() et non list()
- * @param {string} accountId - ID du compte
- * @returns {Promise<Array>}
- */
-async function getFoldersForAccount(accountId) {
+  
   try {
-    const messengerAPI = getMessengerAPI();
-    
-    if (messengerAPI && messengerAPI.folders) {
-      // Utiliser query() au lieu de list() - voir documentation Thunderbird
-      return await messengerAPI.folders.query({ accountId: accountId });
+    switch (type) {
+      case 'MESSENGER_GET_ACCOUNTS':
+        return await messengerAPI.accounts.list();
+      
+      case 'MESSENGER_GET_FOLDERS':
+        return await messengerAPI.folders.query({ accountId: data.accountId });
+      
+      case 'MESSENGER_GET_EMAILS':
+        return await messengerAPI.messages.list(data.folderId, data.options || {});
+      
+      case 'MESSENGER_GET_FULL_EMAIL':
+        return await messengerAPI.messages.getFull(data.messageId);
+      
+      case 'MESSENGER_GET_FOLDER':
+        return await messengerAPI.folders.get(data.folderId);
+      
+      case 'MESSENGER_GET_MESSAGE':
+        return await messengerAPI.messages.get(data.messageId);
+      
+      default:
+        throw new Error(`Type de requête messenger inconnu: ${type}`);
     }
-    
-    throw new Error(`Aucune API de dossiers disponible pour le compte ${accountId}`);
   } catch (error) {
-    await logError(error, `Récupération des dossiers pour le compte ${accountId}`);
-    return [];
-  }
-}
-
-/**
- * Récupère un email complet
- * @param {string} messageId - ID de l'email
- * @returns {Promise<Object|null>}
- */
-async function getFullEmail(messageId) {
-  try {
-    const messengerAPI = getMessengerAPI();
-    
-    if (messengerAPI && messengerAPI.messages) {
-      return await messengerAPI.messages.getFull(messageId);
-    }
-    
-    return null;
-  } catch (error) {
-    await logError(error, `Récupération de l'email ${messageId}`);
-    return null;
+    await logError(error, `Requête messenger: ${type}`);
+    throw error;
   }
 }
 
@@ -190,6 +171,18 @@ async function handleMessage(message, sender, sendResponse) {
   try {
     await logInfo(`Message reçu : ${message.type}`);
     
+    // Gérer les requêtes messenger directement
+    if (message.type.startsWith('MESSENGER_')) {
+      try {
+        const data = await handleMessengerRequest(message.type, message);
+        sendResponse({ success: true, data });
+        return;
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+        return;
+      }
+    }
+    
     switch (message.type) {
       case 'GET_INDEX_STATS':
         const stats = await getIndexStats();
@@ -234,8 +227,14 @@ async function getAccountsAndFolders() {
   try {
     await logInfo('Récupération des comptes et dossiers');
     
+    const messengerAPI = getMessengerAPI();
+    
+    if (!messengerAPI) {
+      throw new Error('Aucune API messenger disponible');
+    }
+    
     // Récupérer les comptes
-    const accounts = await getAccounts();
+    const accounts = await messengerAPI.accounts.list();
     
     if (accounts.length === 0) {
       await logWarn('Aucun compte trouvé - vérifiez les permissions dans manifest.json');
@@ -246,7 +245,7 @@ async function getAccountsAndFolders() {
     let allFolders = [];
     for (const account of accounts) {
       try {
-        const folders = await getFoldersForAccount(account.id);
+        const folders = await messengerAPI.folders.query({ accountId: account.id });
         allFolders = allFolders.concat(folders);
       } catch (error) {
         await logError(error, `Erreur lors de la récupération des dossiers pour le compte ${account.id}`);
@@ -270,6 +269,9 @@ async function handleMessageCreated(message) {
   try {
     await logInfo(`Nouvel email créé : ${message.id}`);
     
+    const messengerAPI = getMessengerAPI();
+    if (!messengerAPI) return;
+    
     // Récupérer la configuration
     const config = await getConfig();
     const selectedFolders = config.selectedFolders || [];
@@ -277,7 +279,7 @@ async function handleMessageCreated(message) {
     // Vérifier si le dossier de l'email est sélectionné pour l'indexation
     if (selectedFolders.includes(message.folderId)) {
       // Récupérer le contenu complet de l'email
-      const fullEmail = await getFullEmail(message.id);
+      const fullEmail = await messengerAPI.messages.getFull(message.id);
       
       if (fullEmail) {
         // Indexer le nouvel email
@@ -309,6 +311,9 @@ async function handleMessageModified(message) {
   try {
     await logInfo(`Email modifié : ${message.id}`);
     
+    const messengerAPI = getMessengerAPI();
+    if (!messengerAPI) return;
+    
     // Récupérer la configuration
     const config = await getConfig();
     const selectedFolders = config.selectedFolders || [];
@@ -316,7 +321,7 @@ async function handleMessageModified(message) {
     // Vérifier si le dossier de l'email est sélectionné pour l'indexation
     if (selectedFolders.includes(message.folderId)) {
       // Récupérer le contenu complet de l'email
-      const fullEmail = await getFullEmail(message.id);
+      const fullEmail = await messengerAPI.messages.getFull(message.id);
       
       if (fullEmail) {
         // Réindexer l'email modifié
@@ -369,6 +374,9 @@ async function handleMessagesMoved(messageIds, sourceFolderId, destinationFolder
   try {
     await logInfo(`Emails déplacés : ${messageIds.join(', ')} de ${sourceFolderId} vers ${destinationFolderId}`);
     
+    const messengerAPI = getMessengerAPI();
+    if (!messengerAPI) return;
+    
     // Récupérer la configuration
     const config = await getConfig();
     const selectedFolders = config.selectedFolders || [];
@@ -380,7 +388,7 @@ async function handleMessagesMoved(messageIds, sourceFolderId, destinationFolder
     for (const messageId of messageIds) {
       if (destinationSelected && !sourceSelected) {
         // L'email est déplacé vers un dossier indexé : l'indexer
-        const fullEmail = await getFullEmail(messageId);
+        const fullEmail = await messengerAPI.messages.getFull(messageId);
         if (fullEmail) {
           await indexEmail({
             id: fullEmail.id,
