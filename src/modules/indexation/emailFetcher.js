@@ -222,15 +222,16 @@ export async function fetchEmailsForIndexation(selectedFolderIds, config = null)
             folderName: folderInfo.name || folderInfo.path,
             subject: fullMessage.subject || '',
             body: fullMessage.body || '',
-            from: fullMessage.from?.value || '',
-            to: fullMessage.to?.value || '',
-            cc: fullMessage.cc?.value || '',
-            bcc: fullMessage.bcc?.value || '',
+            author: fullMessage.author || fullMessage.from?.value || '',
+            recipients: fullMessage.recipients || fullMessage.to?.value ? [fullMessage.to.value] : [],
             date: fullMessage.date ? new Date(fullMessage.date).getTime() : null,
             lastModified: fullMessage.lastModified ? new Date(fullMessage.lastModified).getTime() : null,
             size: fullMessage.size || 0,
             flags: fullMessage.flags || [],
             tags: fullMessage.tags || [],
+            read: fullMessage.read || false,
+            flagged: fullMessage.flagged || false,
+            junk: fullMessage.junk || false,
             attachments: indexAttachments ? fullMessage.attachments || [] : [],
           });
         }
@@ -303,11 +304,14 @@ export async function fetchModifiedEmails(selectedFolderIds, lastIndexation, con
             folderName: folderInfo.name || folderInfo.path,
             subject: fullMessage.subject || '',
             body: fullMessage.body || '',
-            from: fullMessage.from?.value || '',
-            to: fullMessage.to?.value || '',
+            author: fullMessage.author || fullMessage.from?.value || '',
+            recipients: fullMessage.recipients || fullMessage.to?.value ? [fullMessage.to.value] : [],
             date: fullMessage.date ? new Date(fullMessage.date).getTime() : null,
             lastModified: fullMessage.lastModified ? new Date(fullMessage.lastModified).getTime() : null,
             size: fullMessage.size || 0,
+            read: fullMessage.read || false,
+            flagged: fullMessage.flagged || false,
+            junk: fullMessage.junk || false,
           });
         }
       }
