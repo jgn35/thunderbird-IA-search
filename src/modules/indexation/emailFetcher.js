@@ -69,8 +69,16 @@ async function handleMessengerRequest(type, data = {}) {
     case 'MESSENGER_GET_MESSAGE':
       return await messengerAPI.messages.get(data.messageId);
     
+    case 'MESSENGER_EMAIL_EXISTS':
+      try {
+        const message = await messengerAPI.messages.get(data.messageId);
+        return !!message;
+      } catch (error) {
+        return false;
+      }
+    
     default:
-      throw new Error(`Type de requête inconnu: ${type}`);
+      throw new Error(`Type de requête messenger inconnu: ${type}`);
   }
 }
 
@@ -176,6 +184,21 @@ export async function getMessage(messageId) {
   } catch (error) {
     await logError(error, `Récupération du message ${messageId}`);
     return null;
+  }
+}
+
+/**
+ * Vérifie si un email existe
+ * @param {string} messageId - L'ID du message
+ * @returns {Promise<boolean>} True si l'email existe, false sinon
+ */
+export async function emailExists(messageId) {
+  try {
+    const exists = await sendMessengerRequest('MESSENGER_EMAIL_EXISTS', { messageId });
+    return exists;
+  } catch (error) {
+    await logError(error, `Vérification de l'existence de l'email ${messageId}`);
+    return false;
   }
 }
 
