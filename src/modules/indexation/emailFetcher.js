@@ -76,7 +76,7 @@ export async function getEmails(folderId, options = {}) {
   try {
     const messengerAPI = getMessengerAPI();
     const result = await messengerAPI.messages.list({
-      folderId,
+      folder: folderId,
       limit,
       offset
     });
