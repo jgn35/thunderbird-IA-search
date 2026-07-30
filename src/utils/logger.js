@@ -96,7 +96,7 @@ export async function exportLogsToFile() {
   const url = URL.createObjectURL(blob);
   
   try {
-    await messenger.downloads.download({
+    await browser.downloads.download({
       url: url,
       filename: `thunderbird_rag_logs_${new Date().toISOString().slice(0, 10)}.txt`,
       saveAs: true,

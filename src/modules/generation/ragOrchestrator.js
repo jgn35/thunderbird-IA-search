@@ -399,7 +399,7 @@ export async function setLLMType(llmType) {
     }
 
     const config = await getConfig();
-    await messenger.storage.local.set({
+    await browser.storage.local.set({
       rag: {
         ...config.rag,
         type: llmType,

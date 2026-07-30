@@ -1,6 +1,6 @@
 /**
  * Gestionnaire de stockage pour les paramètres de l'extension
- * Utilise l'API messenger.storage.local de Thunderbird
+ * Utilise l'API browser.storage.local de Thunderbird
  * @module config/storageManager
  */
 
@@ -24,7 +24,7 @@ const LOGS_KEY = 'ragExtensionLogs';
  */
 export async function getConfig() {
   try {
-    const result = await messenger.storage.local.get(STORAGE_KEY);
+    const result = await browser.storage.local.get(STORAGE_KEY);
     if (result[STORAGE_KEY]) {
       return result[STORAGE_KEY];
     }
@@ -45,7 +45,7 @@ export async function getConfig() {
  */
 export async function saveConfig(config) {
   try {
-    await messenger.storage.local.set({ [STORAGE_KEY]: config });
+    await browser.storage.local.set({ [STORAGE_KEY]: config });
   } catch (error) {
     console.error('Erreur lors de la sauvegarde de la configuration:', error);
     throw error;
@@ -80,7 +80,7 @@ export async function resetConfig() {
  */
 export async function getLogs() {
   try {
-    const result = await messenger.storage.local.get(LOGS_KEY);
+    const result = await browser.storage.local.get(LOGS_KEY);
     return result[LOGS_KEY] || [];
   } catch (error) {
     console.error('Erreur lors de la récupération des logs:', error);
@@ -100,7 +100,7 @@ export async function addLog(message) {
     logs.push(`[${timestamp}] ${message}`);
     // Garder seulement les 1000 derniers logs pour éviter de saturer le stockage
     const trimmedLogs = logs.slice(-1000);
-    await messenger.storage.local.set({ [LOGS_KEY]: trimmedLogs });
+    await browser.storage.local.set({ [LOGS_KEY]: trimmedLogs });
   } catch (error) {
     console.error('Erreur lors de l\'ajout d\'un log:', error);
   }
@@ -112,7 +112,7 @@ export async function addLog(message) {
  */
 export async function clearLogs() {
   try {
-    await messenger.storage.local.set({ [LOGS_KEY]: [] });
+    await browser.storage.local.set({ [LOGS_KEY]: [] });
   } catch (error) {
     console.error('Erreur lors de l\'effacement des logs:', error);
   }

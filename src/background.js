@@ -40,7 +40,7 @@ async function initBackground() {
  */
 function setupEventListeners() {
   // Écouter les messages des autres parties de l'extension
-  messenger.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleMessage(message, sender, sendResponse);
     return true; // Indique que sendResponse sera appelé de manière asynchrone
   });

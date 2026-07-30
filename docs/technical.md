@@ -102,7 +102,7 @@ const embeddingConfig = await checkEmbeddingConfig();
 **Stockage des Données** :
 - **Embeddings** : IndexedDB (collection `emails`)
 - **Métadonnées** : Stockées avec les embeddings dans IndexedDB
-- **Configuration** : `messenger.storage.local` (Thunderbird)
+- **Configuration** : `browser.storage.local` (Thunderbird)
 
 ---
 
@@ -326,7 +326,7 @@ const result = await setLLMType('local');
 - `from` : Pour le filtrage par expéditeur
 - `to` : Pour le filtrage par destinataire
 
-### messenger.storage.local
+### browser.storage.local
 
 **Clé** : `ragExtensionConfig`
 
@@ -476,7 +476,7 @@ Si les embeddings ne sont pas disponibles (pas de clé API configurée), l'exten
 ### Journalisation
 
 - **Logs en texte brut** : Tous les logs sont stockés en texte brut
-- **Stockage** : `messenger.storage.local` (limité à 1000 logs)
+- **Stockage** : `browser.storage.local` (limité à 1000 logs)
 - **Export** : Possibilité d'exporter les logs vers un fichier
 
 **Niveaux de log** :
@@ -486,7 +486,7 @@ Si les embeddings ne sont pas disponibles (pas de clé API configurée), l'exten
 
 ### Gestion des Clés API
 
-- **Stockage** : Les clés API sont stockées dans `messenger.storage.local`
+- **Stockage** : Les clés API sont stockées dans `browser.storage.local`
 - **Sécurité** : Les clés ne sont jamais envoyées à des tiers sans le consentement de l'utilisateur
 - **Configuration** : L'utilisateur doit explicitement configurer sa clé API
 
@@ -660,7 +660,7 @@ Pour diagnostiquer les problèmes, activez les logs et exportez-les :
 
 ```javascript
 // Dans la console de l'extension
-messenger.runtime.sendMessage({ type: 'EXPORT_LOGS' });
+browser.runtime.sendMessage({ type: 'EXPORT_LOGS' });
 ```
 
 Ou via l'interface utilisateur :
