@@ -54,7 +54,11 @@ async function handleMessengerRequest(type, data = {}) {
         return await messengerAPI.folders.query({ accountId: data.accountId });
       
       case 'MESSENGER_GET_EMAILS':
-        return await messengerAPI.messages.list(data.folderId, data.options || {});
+        // messages.list() prend UN objet avec les propriétés, pas deux arguments
+        return await messengerAPI.messages.list({
+          folderId: data.folderId,
+          ...(data.options || {})
+        });
       
       case 'MESSENGER_GET_FULL_EMAIL':
         return await messengerAPI.messages.getFull(data.messageId);
@@ -64,6 +68,14 @@ async function handleMessengerRequest(type, data = {}) {
       
       case 'MESSENGER_GET_MESSAGE':
         return await messengerAPI.messages.get(data.messageId);
+    
+    case 'MESSENGER_EMAIL_EXISTS':
+      try {
+        const message = await messengerAPI.messages.get(data.messageId);
+        return !!message;
+      } catch (error) {
+        return false;
+      }
       
       default:
         throw new Error(`Type de requête messenger inconnu: ${type}`);

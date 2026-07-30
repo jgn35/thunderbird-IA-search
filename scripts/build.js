@@ -23,6 +23,7 @@ const COPY_FILES = [
   { src: path.join(MODULES_UI_DIR, 'sidebar.html'), dest: path.join(DIST_DIR, 'sidebar.html') },
   { src: path.join(MODULES_UI_DIR, 'options.html'), dest: path.join(DIST_DIR, 'options.html') },
   { src: path.join(MODULES_UI_DIR, 'sidebar.css'), dest: path.join(DIST_DIR, 'sidebar.css') },
+  { src: path.join(MODULES_UI_DIR, 'options.css'), dest: path.join(DIST_DIR, 'options.css') },
 ];
 
 // Scripts à bundler
@@ -50,9 +51,9 @@ async function copyFile(src, dest) {
   try {
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.copyFile(src, dest);
-    console.log(`✓ Copied: ${path.relative(PROJECT_ROOT, src)} → ${path.relative(PROJECT_ROOT, dest)}`);
+    console.log(`\u2713 Copied: ${path.relative(PROJECT_ROOT, src)} \u2192 ${path.relative(PROJECT_ROOT, dest)}`);
   } catch (error) {
-    console.error(`✗ Failed to copy ${src}:`, error.message);
+    console.error(`\u2717 Failed to copy ${src}:`, error.message);
     throw error;
   }
 }
@@ -67,9 +68,9 @@ async function bundleScript(entry, out) {
       entryPoints: [entry],
       outfile: out,
     });
-    console.log(`✓ Bundled: ${path.relative(PROJECT_ROOT, entry)} → ${path.relative(PROJECT_ROOT, out)}`);
+    console.log(`\u2713 Bundled: ${path.relative(PROJECT_ROOT, entry)} \u2192 ${path.relative(PROJECT_ROOT, out)}`);
   } catch (error) {
-    console.error(`✗ Failed to bundle ${entry}:`, error.message);
+    console.error(`\u2717 Failed to bundle ${entry}:`, error.message);
     throw error;
   }
 }
@@ -81,9 +82,9 @@ async function cleanDist() {
   try {
     await fs.rm(DIST_DIR, { recursive: true, force: true });
     await fs.mkdir(DIST_DIR, { recursive: true });
-    console.log(`✓ Cleaned: ${path.relative(PROJECT_ROOT, DIST_DIR)}`);
+    console.log(`\u2713 Cleaned: ${path.relative(PROJECT_ROOT, DIST_DIR)}`);
   } catch (error) {
-    console.error(`✗ Failed to clean ${DIST_DIR}:`, error.message);
+    console.error(`\u2717 Failed to clean ${DIST_DIR}:`, error.message);
     throw error;
   }
 }
@@ -106,13 +107,13 @@ async function build() {
     console.log('\nBundling scripts with esbuild...');
     await Promise.all(BUNDLE_SCRIPTS.map(({ entry, out }) => bundleScript(entry, out)));
 
-    console.log('\n✅ Build completed successfully!');
+    console.log('\n\u2705 Build completed successfully!');
     console.log(`Output directory: ${path.relative(PROJECT_ROOT, DIST_DIR)}`);
   } catch (error) {
-    console.error('\n❌ Build failed:', error);
+    console.error('\n\u274c Build failed:', error);
     process.exit(1);
   }
 }
 
-// Exécuter le build
+// Ex\u00e9cuter le build
 build();

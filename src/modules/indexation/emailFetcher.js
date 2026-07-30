@@ -58,7 +58,11 @@ async function handleMessengerRequest(type, data = {}) {
       return await messengerAPI.folders.query({ accountId: data.accountId });
     
     case 'MESSENGER_GET_EMAILS':
-      return await messengerAPI.messages.list(data.folderId, data.options || {});
+      // messages.list() prend UN objet avec les propriétés, pas deux arguments
+      return await messengerAPI.messages.list({
+        folderId: data.folderId,
+        ...(data.options || {})
+      });
     
     case 'MESSENGER_GET_FULL_EMAIL':
       return await messengerAPI.messages.getFull(data.messageId);
