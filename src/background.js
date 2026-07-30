@@ -14,20 +14,37 @@ import {
 } from './modules/indexation/indexer.js';
 
 /**
+ * Obtient l'API messenger disponible
+ * Dans Thunderbird, on peut utiliser soit browser.messenger soit messenger (objet global)
+ * @returns {Object|null} L'API messenger ou null si non disponible
+ */
+function getMessengerAPI() {
+  // Essayer messenger (objet global dans les modules privilégiés)
+  if (typeof messenger !== 'undefined' && messenger) {
+    return messenger;
+  }
+  
+  // Essayer browser.messenger (API standard WebExtension)
+  if (typeof browser !== 'undefined' && browser && browser.messenger) {
+    return browser.messenger;
+  }
+  
+  return null;
+}
+
+/**
  * Récupère les comptes via l'API Thunderbird
- * Dans Thunderbird, on utilise browser.messenger.accounts.list()
  * @returns {Promise<Array>}
  */
 async function getAccounts() {
   try {
-    // Dans Thunderbird, l'API messenger est toujours disponible dans le background script
-    if (browser.messenger && browser.messenger.accounts) {
-      return await browser.messenger.accounts.list();
+    const messengerAPI = getMessengerAPI();
+    
+    if (messengerAPI && messengerAPI.accounts) {
+      return await messengerAPI.accounts.list();
     }
     
-    // Fallback pour d'autres environnements (tests, etc.)
-    await logWarn('browser.messenger.accounts non disponible');
-    return [];
+    throw new Error('Aucune API de comptes disponible');
   } catch (error) {
     await logError(error, 'Récupération des comptes');
     return [];
@@ -36,21 +53,20 @@ async function getAccounts() {
 
 /**
  * Récupère les dossiers pour un compte
- * Dans Thunderbird, on utilise browser.messenger.folders.query()
+ * Dans Thunderbird, on utilise folders.query() et non list()
  * @param {string} accountId - ID du compte
  * @returns {Promise<Array>}
  */
 async function getFoldersForAccount(accountId) {
   try {
-    // Dans Thunderbird, l'API messenger est toujours disponible dans le background script
-    if (browser.messenger && browser.messenger.folders) {
-      // Utiliser query() avec un filtre sur accountId
-      return await browser.messenger.folders.query({ accountId: accountId });
+    const messengerAPI = getMessengerAPI();
+    
+    if (messengerAPI && messengerAPI.folders) {
+      // Utiliser query() au lieu de list() - voir documentation Thunderbird
+      return await messengerAPI.folders.query({ accountId: accountId });
     }
     
-    // Fallback pour d'autres environnements
-    await logWarn(`browser.messenger.folders non disponible pour le compte ${accountId}`);
-    return [];
+    throw new Error(`Aucune API de dossiers disponible pour le compte ${accountId}`);
   } catch (error) {
     await logError(error, `Récupération des dossiers pour le compte ${accountId}`);
     return [];
@@ -64,9 +80,12 @@ async function getFoldersForAccount(accountId) {
  */
 async function getFullEmail(messageId) {
   try {
-    if (browser.messenger && browser.messenger.messages) {
-      return await browser.messenger.messages.getFull(messageId);
+    const messengerAPI = getMessengerAPI();
+    
+    if (messengerAPI && messengerAPI.messages) {
+      return await messengerAPI.messages.getFull(messageId);
     }
+    
     return null;
   } catch (error) {
     await logError(error, `Récupération de l'email ${messageId}`);
@@ -81,13 +100,14 @@ async function initBackground() {
   try {
     await logInfo('Initialisation du script de fond');
     
-    // Dans Thunderbird, browser.messenger DOIT être disponible dans le background script
-    // Si ce n'est pas le cas, c'est une erreur de configuration
-    if (!browser.messenger) {
-      await logError('CRITICAL: browser.messenger non disponible dans le background script. ' +
-                    'Vérifiez que le script est bien exécuté dans le contexte du background.');
+    // Vérifier la disponibilité de l'API messenger
+    const messengerAPI = getMessengerAPI();
+    
+    if (!messengerAPI) {
+      await logError('CRITICAL: Aucune API messenger disponible (ni browser.messenger ni messenger). ' +
+                    'Vérifiez que le script est exécuté dans le contexte du background.');
     } else {
-      await logInfo('API browser.messenger est disponible dans le background script');
+      await logInfo('API messenger est disponible dans le background script');
     }
     
     // Initialiser l'indexeur
@@ -110,17 +130,20 @@ async function initBackground() {
  */
 function setupEventListeners() {
   // Écouter les messages des autres parties de l'extension
-  if (browser.runtime && browser.runtime.onMessage) {
-    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const runtimeAPI = typeof browser !== 'undefined' ? browser.runtime : null;
+  
+  if (runtimeAPI && runtimeAPI.onMessage) {
+    runtimeAPI.onMessage.addListener((message, sender, sendResponse) => {
       handleMessage(message, sender, sendResponse);
       return true; // Indique que sendResponse sera appelé de manière asynchrone
     });
   }
 
   // Écouter les changements dans les emails
-  // Dans Thunderbird, ces écouteurs sont disponibles via browser.messenger
-  if (browser.messenger && browser.messenger.messages) {
-    browser.messenger.messages.onNewMailReceived.addListener((folder, messages) => {
+  const messengerAPI = getMessengerAPI();
+  
+  if (messengerAPI && messengerAPI.messages) {
+    messengerAPI.messages.onNewMailReceived.addListener((folder, messages) => {
       if (Array.isArray(messages)) {
         for (const message of messages) {
           handleMessageCreated(message);
@@ -128,30 +151,30 @@ function setupEventListeners() {
       }
     });
 
-    browser.messenger.messages.onUpdated.addListener((message, changedProperties, oldProperties) => {
+    messengerAPI.messages.onUpdated.addListener((message, changedProperties, oldProperties) => {
       handleMessageModified(message);
     });
 
-    browser.messenger.messages.onDeleted.addListener((messageIds) => {
+    messengerAPI.messages.onDeleted.addListener((messageIds) => {
       handleMessagesDeleted(messageIds);
     });
 
-    browser.messenger.messages.onMoved.addListener((messageIds, sourceFolderId, destinationFolderId) => {
+    messengerAPI.messages.onMoved.addListener((messageIds, sourceFolderId, destinationFolderId) => {
       handleMessagesMoved(messageIds, sourceFolderId, destinationFolderId);
     });
   }
 
   // Écouter les changements dans les dossiers
-  if (browser.messenger && browser.messenger.folders) {
-    browser.messenger.folders.onCreated.addListener((folder) => {
+  if (messengerAPI && messengerAPI.folders) {
+    messengerAPI.folders.onCreated.addListener((folder) => {
       handleFolderCreated(folder);
     });
 
-    browser.messenger.folders.onDeleted.addListener((folderId) => {
+    messengerAPI.folders.onDeleted.addListener((folderId) => {
       handleFolderDeleted(folderId);
     });
 
-    browser.messenger.folders.onFolderInfoChanged.addListener((folder, folderInfo) => {
+    messengerAPI.folders.onFolderInfoChanged.addListener((folder, folderInfo) => {
       handleFolderModified(folder);
     });
   }
