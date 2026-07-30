@@ -1,34 +1,36 @@
 # Documentation Technique - Thunderbird RAG Search Extension
 
-## 📚 Table des Matières
+## 📌 Table des Matières
 
 1. [Architecture Générale](#architecture-générale)
-2. [Modules](#modules)
+2. [Communication Inter-Modules](#communication-inter-modules)
+3. [Modules](#modules)
+   - [Script Background](#script-background)
    - [Module d'Indexation](#module-dindexation)
    - [Module de Recherche](#module-de-recherche)
    - [Module de Génération (RAG)](#module-de-génération-rag)
    - [Module UI](#module-ui)
    - [Module de Configuration](#module-de-configuration)
-3. [Flux de Données](#flux-de-données)
-4. [Stockage des Données](#stockage-des-données)
-5. [Embeddings et Recherche Vectorielle](#embeddings-et-recherche-vectorielle)
-6. [Configuration](#configuration)
-7. [Sécurité](#sécurité)
-8. [Performances](#performances)
-9. [Tests](#tests)
-10. [Dépannage](#dépannage)
-11. [Décisions Techniques](#décisions-techniques)
+4. [Flux de Données](#flux-de-données)
+5. [Stockage des Données](#stockage-des-données)
+6. [Embeddings et Recherche Vectorielle](#embeddings-et-recherche-vectorielle)
+7. [Configuration](#configuration)
+8. [Sécurité](#sécurité)
+9. [Performances](#performances)
+10. [Tests](#tests)
+11. [Dépannage](#dépannage)
+12. [Décisions Techniques](#décisions-techniques)
 
 ---
 
 ## 🏗️ Architecture Générale
 
-L'extension suit une **architecture modulaire** avec séparation claire des responsabilités :
+L'extension suit une **architecture modulaire** avec séparation claire des responsabilités. Depuis la refactorisation, **toute la logique d'indexation est centralisée dans le script background**, tandis que les interfaces utilisateur (sidebar et options) communiquent uniquement via des messages.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────────────────────────────────┐
 │                        Thunderbird RAG Search                      │
-├─────────────────────────────────────────────────────────────────┤
+├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
 │  │  Indexation │    │   Recherche │    │  Génération │         │
@@ -37,17 +39,24 @@ L'extension suit une **architecture modulaire** avec séparation claire des resp
 │           │                   │                   │                │
 │           └───────────────────┼───────────────────┘                │
 │                               ▼                                      │
-│                    ┌─────────────────┐                            │
-│                    │     Vector      │                            │
-│                    │    Store       │                            │
-│                    │  (IndexedDB)    │                            │
-│                    └─────────────────┘                            │
+│                    ┌─────────────────────┐                            │
+│                    │     Vector Store    │                            │
+│                    │   (IndexedDB)        │                            │
+│                    └─────────────────────┘                            │
 │                                                                  │
-│                    ┌─────────────────┐                            │
-│                    │      UI         │                            │
-│                    │   (Sidebar)     │                            │
-│                    └─────────────────┘                            │
-└─────────────────────────────────────────────────────────────────┘
+│                    ┌─────────────────────┐                            │
+│                    │       Background    │◄───────────────────────┐
+│                    │      Script         │         │               │
+│                    │  (Gère tout l'index) │         │               │
+│                    └─────────────────────┘         │               │
+│                               ▲                          │               │
+│                               │                          │               │
+│                    ┌─────────────────────┐         │               │
+│                    │         UI         │         │               │
+│                    │   (Sidebar/Options)  │         │               │
+│                    │  (Messages uniquement)│         │               │
+│                    └─────────────────────┘         │               │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Technologies Utilisées
@@ -63,7 +72,108 @@ L'extension suit une **architecture modulaire** avec séparation claire des resp
 
 ---
 
+## 📡 Communication Inter-Modules
+
+### Principe Fondamental
+
+**Toute la logique d'indexation est centralisée dans `background.js`**. Les interfaces utilisateur (sidebar et options) **n'appellent plus directement les fonctions d'indexation**, mais envoient des messages au script background via `browser.runtime.sendMessage()`.
+
+### Types de Messages
+
+#### Messages d'Indexation
+
+| Type | Description | Paramètres | Réponse |
+|------|-------------|-----------|---------|
+| `INDEX_ALL_EMAILS` | Indexe tous les emails des dossiers sélectionnés | `selectedFolderIds`, `config` | Statistiques d'indexation |
+| `INDEX_MODIFIED_EMAILS` | Indexe uniquement les emails modifiés | `selectedFolderIds`, `config` | Statistiques d'indexation |
+| `CLEAR_INDEX` | Supprime tous les emails indexés | - | Résultat de la suppression |
+| `INDEX_EMAIL` | Indexe un email spécifique | `emailData` | Booléen de succès |
+| `UNINDEX_EMAIL` | Supprime un email de l'index | `emailId`, `lastModified` | Booléen de succès |
+| `GET_INDEX_STATS` | Récupère les statistiques de l'index | - | Statistiques |
+| `GET_INDEXATION_STATE` | Récupère l'état actuel de l'indexation | - | État |
+| `CHECK_EMAIL_INDEXED` | Vérifie si un email est indexé | `emailId`, `lastModified` | Booléen |
+| `CHECK_EMBEDDING_CONFIG` | Vérifie la configuration des embeddings | - | Configuration |
+
+#### Messages Messenger (Thunderbird API)
+
+| Type | Description | Paramètres | Réponse |
+|------|-------------|-----------|---------|
+| `MESSENGER_GET_ACCOUNTS` | Récupère la liste des comptes | - | Liste des comptes |
+| `MESSENGER_GET_FOLDERS` | Récupère les dossiers d'un compte | `accountId` | Liste des dossiers |
+| `MESSENGER_GET_EMAILS` | Récupère les emails d'un dossier | `folderId`, `options` | Liste des emails |
+| `MESSENGER_GET_FULL_EMAIL` | Récupère le contenu complet d'un email | `messageId` | Email complet |
+| `MESSENGER_EMAIL_EXISTS` | Vérifie si un email existe | `messageId` | Booléen |
+
+#### Messages de Configuration
+
+| Type | Description | Paramètres | Réponse |
+|------|-------------|-----------|---------|
+| `GET_CONFIG` | Récupère la configuration actuelle | - | Configuration |
+| `GET_ACCOUNTS_AND_FOLDERS` | Récupère comptes et dossiers | - | Comptes et dossiers |
+
+### Exemple de Communication
+
+**Depuis l'UI (sidebar.js ou options.js) :**
+```javascript
+// Démarrer une indexation complète
+const result = await browser.runtime.sendMessage({
+  type: 'INDEX_ALL_EMAILS',
+  selectedFolderIds: ['folder1', 'folder2'],
+  config: appState.config
+});
+
+if (result.success) {
+  console.log(`Indexation terminée: ${result.indexed} emails indexés`);
+}
+```
+
+**Dans background.js :**
+```javascript
+// Gestion du message
+case 'INDEX_ALL_EMAILS':
+  const result = await indexAllEmails(message.selectedFolderIds, message.config);
+  sendResponse({ success: result.success, ...result });
+  break;
+```
+
+### Avantages de cette Architecture
+
+1. **Centralisation** : Toute la logique métier est dans un seul endroit (background.js)
+2. **Sécurité** : Le background script a accès à toutes les API Thunderbird
+3. **Maintenabilité** : Plus facile à déboguer et à faire évoluer
+4. **Isolation** : Les UI ne dépendent plus des modules d'indexation
+5. **Testabilité** : Les fonctions d'indexation peuvent être testées indépendamment
+
+---
+
 ## 📦 Modules
+
+### Script Background
+
+**Fichier** : `src/background.js`
+
+**Responsabilités** :
+- Point central de toute la logique d'indexation
+- Gestion des messages entre les différents modules
+- Écoute des événements Thunderbird (nouveaux emails, suppressions, etc.)
+- Vérifications périodiques des emails modifiés
+- Coordination entre les modules d'indexation, de recherche et de génération
+
+**Fonctionnalités Clés** :
+
+```javascript
+// Initialisation
+initBackground();
+
+// Gestion des messages
+browser.runtime.onMessage.addListener(handleMessage);
+
+// Écoute des événements Thunderbird
+messenger.messages.onNewMailReceived.addListener(handleMessageCreated);
+messenger.messages.onDeleted.addListener(handleMessagesDeleted);
+```
+
+---
 
 ### Module d'Indexation
 
@@ -83,20 +193,24 @@ L'extension suit une **architecture modulaire** avec séparation claire des resp
 - Réindexation automatique des emails modifiés
 - Suppression des données lors de la suppression d'emails
 
+**⚠️ Important** : Ce module **n'est plus appelé directement depuis l'UI**. Toutes les fonctions sont maintenant appelées **uniquement depuis background.js** via les messages.
+
 **Fonctionnalités Clés** :
 
 ```javascript
+// Ces fonctions sont appelées UNIQUEMENT depuis background.js
+
 // Indexation complète
-const result = await indexAllEmails(['folderId1', 'folderId2']);
+export async function indexAllEmails(selectedFolderIds, config = null) { ... }
 
 // Indexation incrémentale
-const result = await indexModifiedEmails(['folderId1']);
+export async function indexModifiedEmails(selectedFolderIds, config = null) { ... }
 
 // Vérification de l'indexation
-const isIndexed = await checkEmailIndexed('emailId123');
+export async function checkEmailIndexed(emailId, lastModified = null) { ... }
 
 // Vérification de la configuration des embeddings
-const embeddingConfig = await checkEmbeddingConfig();
+export async function checkEmbeddingConfig() { ... }
 ```
 
 **Stockage des Données** :
@@ -193,6 +307,8 @@ const result = await setLLMType('local');
 - `src/modules/ui/sidebar.js` - Logique principale de l'interface
 - `src/modules/ui/sidebar.html` - Structure HTML
 - `src/modules/ui/sidebar.css` - Styles CSS
+- `src/modules/ui/options.js` - Page des options
+- `src/modules/ui/options.html` - Structure HTML des options
 
 **Responsabilités** :
 - Interface utilisateur dans la barre latérale de Thunderbird
@@ -201,6 +317,10 @@ const result = await setLLMType('local');
 - Affichage des résultats de recherche
 - Affichage des résultats RAG
 - Gestion des erreurs et notifications
+
+**⚠️ Changement Architectural** : 
+- **Avant** : Appel direct aux fonctions d'indexation (`indexAllEmails()`, etc.)
+- **Maintenant** : Envoi de messages au background script via `browser.runtime.sendMessage()`
 
 **Fonctionnalités Clés** :
 - Onglets pour différentes fonctionnalités
@@ -230,6 +350,8 @@ const result = await setLLMType('local');
     excludedFolders: ["Spam"],
     indexAttachments: false,
     maxEmailSize: 10485760, // 10 Mo
+    chunkSize: 512,
+    chunkOverlap: 100,
   },
   rag: {
     type: "api_externe",
@@ -237,14 +359,20 @@ const result = await setLLMType('local');
       endpoint: "https://api.mistral.ai/v1",
       apiKey: "",
       embeddingEndpoint: "https://api.mistral.ai/v1/embeddings",
+      model: "mistral-tiny",
     },
     local: {
       url: "http://localhost:11434",
       model: "mistral-7b",
     },
+    topK: 5,
+    temperature: 0.7,
   },
   selectedFolders: [],
   lastIndexation: null,
+  debug: {
+    enableDebugLogs: false,
+  },
 }
 ```
 
@@ -252,40 +380,106 @@ const result = await setLLMType('local');
 
 ## 🔄 Flux de Données
 
-### Flux d'Indexation
+### Flux d'Indexation (Nouvelle Architecture)
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Sélection   │────▶│ Récupération │────▶│ Prétraitement│
-│ des Dossiers │     │   Emails     │     │   Emails     │
-└─────────────┘     └─────────────┘     └─────────────┘
-                                                       │
-                                                       ▼
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Génération  │◀────│ Indexation   │◀────│ Embeddings   │
-│ Embeddings  │     │ Vector Store │     │ (API Mistral)│
-└─────────────┘     └─────────────┘     └─────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   UI (Sidebar    │     │   UI (Options)   │     │                 │
+│    ou Options)   │     │                 │     │                 │
+└────────┬────────┘     └────────┬────────┘     │                 │
+         │                     │                   │                 │
+         │ Envoyer Message      │ Envoyer Message    │                 │
+         ▼                     ▼                   │                 │
+┌─────────────────────────────────────────────────────────────┐ │
+│                    background.js                              │ │
+│  ┌─────────────────────────────────────────────────────────┐│ │
+│  │ 1. Reçoit le message (INDEX_ALL_EMAILS, etc.)            ││ │
+│  │ 2. Vérifie la configuration                              ││ │
+│  │ 3. Appelle les fonctions d'indexation                    ││ │
+│  │ 4. Gère les événements Thunderbird                       ││ │
+│  │ 5. Retourne le résultat à l'UI                          ││ │
+│  └─────────────────────────────────────────────────────────┘│ │
+└─────────────────────────────────────────────────────────────┘ │
+         │                     │                           │
+         ▼                     ▼                           ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ emailFetcher.js  │ │ vectorStore.js   │ │ embeddingService│
+│ (Récupération)   │ │ (Stockage)       │ │ .js (Embeddings) │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+         │                     │                   │
+         └─────────────────────┼───────────────────┘
+                               ▼
+                    ┌─────────────────┐
+                    │   IndexedDB     │
+                    │ (Stockage local)│
+                    └─────────────────┘
 ```
 
 ### Flux de Recherche RAG
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Requête    │────▶│ Prétraitement│────▶│ Recherche   │
-│ Utilisateur  │     │   Requête    │     │ Vectorielle │
-└─────────────┘     └─────────────┘     └─────────────┘
-                                                       │
-                                                       ▼
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Construction │◀────│  Résultats  │     │ Génération  │
-│   Contexte   │     │  Pertinents │────▶│   RAG       │
-└─────────────┘     └─────────────┘     └─────────────┘
-                                                       │
-                                                       ▼
-                                              ┌─────────────┐
-                                              │   Réponse   │
-                                              │   Finale    │
-                                              └─────────────┘
+┌─────────────────┐
+│   UI (Sidebar)   │
+└────────┬────────┘
+         │
+         │ Requête Utilisateur
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    background.js                              │
+│  (Peut être contourné pour la recherche directe)              │
+└─────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ queryProcessor.js│     │ searchEngine.js │     │ ragOrchestrator.js│
+│ (Prétraitement)  │────▶│ (Recherche)     │────▶│ (Génération)    │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+         │                     │                   │
+         │                     ▼                   ▼
+         │           ┌─────────────────────────────────┐
+         │           │       Vector Store (IndexedDB)   │
+         │           │       + Embeddings              │
+         │           └─────────────────────────────────┘
+         │                             │
+         │                             ▼
+         │           ┌─────────────────────────────────┐
+         └───────────│         Résultats                │
+                     │       + Réponse RAG              │
+                     └─────────────────────────────────┘
+                               │
+                               ▼
+                    ┌─────────────────┐
+                    │   UI (Sidebar)   │
+                    │ (Affichage)      │
+                    └─────────────────┘
+```
+
+### Flux d'Événements Thunderbird
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Thunderbird Events                          │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │ onNewMail       │  │ onUpdated       │  │ onDeleted       │  │
+│  │ Received        │  │                 │  │                 │  │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  │
+└───────────┼────────────────────┼────────────────────┼──────────────┘
+            │                    │                    │
+            ▼                    ▼                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    background.js                              │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │ handleMessage   │  │ handleMessage   │  │ handleMessages  │  │
+│  │ Created         │  │ Modified        │  │ Deleted         │  │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  │
+│           │                  │                   │            │
+│           ▼                  ▼                   ▼            │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ Vérifie si le dossier est sélectionné pour l'indexation   ││
+│  │ Si oui : Récupère l'email et appelle indexEmail()         ││
+│  │ Si non : Ignore l'événement                                ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -298,436 +492,3 @@ const result = await setLLMType('local');
 
 **Store** : `emails`
 
-**Structure des données** :
-
-```javascript
-{
-  id: 'unique-id',           // ID unique généré
-  emailId: 'thunderbird-id', // ID Thunderbird de l'email
-  subject: 'Sujet',          // Sujet de l'email
-  body: 'Corps de l email',  // Corps nettoyé
-  from: 'expéditeur',        // Expéditeur
-  to: 'destinataire',        // Destinataire
-  date: 1234567890,          // Timestamp
-  folderName: 'Inbox',       // Nom du dossier
-  lastModified: 1234567890,  // Dernière modification
-  embedding: [0.1, 0.2, ...], // Vecteur d'embedding (384 dimensions)
-  embeddingHash: 'hash',     // Hash pour indexation
-  timestamp: 1234567890,     // Timestamp d'indexation
-}
-```
-
-**Index** :
-- `emailId` : Pour la recherche par ID Thunderbird
-- `folderName` : Pour le filtrage par dossier
-- `date` : Pour le filtrage par date
-- `lastModified` : Pour l'indexation incrémentale
-- `subject` : Pour la recherche par mots-clés
-- `from` : Pour le filtrage par expéditeur
-- `to` : Pour le filtrage par destinataire
-
-### browser.storage.local
-
-**Clé** : `ragExtensionConfig`
-
-**Structure** :
-
-```javascript
-{
-  indexation: {
-    excludedFolders: ['Spam'],
-    indexAttachments: false,
-    maxEmailSize: 10485760,
-  },
-  rag: {
-    type: 'api_externe',
-    api: {
-      endpoint: 'https://api.mistral.ai/v1',
-      apiKey: 'votre-clé-api',
-      embeddingEndpoint: 'https://api.mistral.ai/v1/embeddings',
-    },
-    local: {
-      url: 'http://localhost:11434',
-      model: 'mistral-7b',
-    },
-  },
-  selectedFolders: ['folder1', 'folder2'],
-  lastIndexation: '2024-07-27T10:00:00.000Z',
-}
-```
-
----
-
-## 🎯 Embeddings et Recherche Vectorielle
-
-### Génération des Embeddings
-
-L'extension utilise **l'API Mistral Embeddings** pour générer des vecteurs de 384 dimensions pour chaque email.
-
-**Endpoint** : `https://api.mistral.ai/v1/embeddings`
-
-**Modèle** : `mistral-embed-text` (par défaut)
-
-**Payload** :
-
-```json
-{
-  "model": "mistral-embed-text",
-  "input": ["texte à transformer en embedding"]
-}
-```
-
-**Réponse** :
-
-```json
-{
-  "data": [
-    {
-      "embedding": [0.123, 0.456, ..., 0.789],
-      "index": 0
-    }
-  ],
-  "model": "mistral-embed-text",
-  "usage": {
-    "prompt_tokens": 10,
-    "total_tokens": 10
-  }
-}
-```
-
-### Similarité Cosinus
-
-La similarité cosinus est utilisée pour mesurer la similarité entre deux vecteurs d'embeddings :
-
-```javascript
-function cosineSimilarity(vectorA, vectorB) {
-  let dotProduct = 0;
-  let magnitudeA = 0;
-  let magnitudeB = 0;
-
-  for (let i = 0; i < vectorA.length; i++) {
-    dotProduct += vectorA[i] * vectorB[i];
-    magnitudeA += vectorA[i] * vectorA[i];
-    magnitudeB += vectorB[i] * vectorB[i];
-  }
-
-  magnitudeA = Math.sqrt(magnitudeA);
-  magnitudeB = Math.sqrt(magnitudeB);
-
-  if (magnitudeA === 0 || magnitudeB === 0) return 0;
-
-  return dotProduct / (magnitudeA * magnitudeB);
-}
-```
-
-**Valeurs** :
-- `1` : Vecteurs identiques (très similaires)
-- `0` : Vecteurs orthogonaux (pas de similarité)
-- `-1` : Vecteurs opposés
-
-### Fallback : Recherche par Mots-Clés
-
-Si les embeddings ne sont pas disponibles (pas de clé API configurée), l'extension utilise une recherche par mots-clés :
-
-1. Normalisation de la requête (suppression des stop words, nettoyage)
-2. Recherche des emails contenant les mots de la requête
-3. Calcul d'un score basé sur le nombre de correspondances
-
----
-
-## ⚙️ Configuration
-
-### Configuration de l'Indexation
-
-| Paramètre | Type | Défaut | Description |
-|-----------|------|--------|-------------|
-| `excludedFolders` | `string[]` | `['Spam']` | Dossiers exclus de l'indexation |
-| `indexAttachments` | `boolean` | `false` | Indexer les pièces jointes |
-| `maxEmailSize` | `number` | `10485760` | Taille maximale des emails (10 Mo) |
-
-### Configuration du RAG
-
-| Paramètre | Type | Défaut | Description |
-|-----------|------|--------|-------------|
-| `type` | `'api_externe' \| 'local'` | `'api_externe'` | Type de LLM à utiliser |
-| `api.endpoint` | `string` | `'https://api.mistral.ai/v1'` | Endpoint API Mistral |
-| `api.apiKey` | `string` | `''` | Clé API Mistral |
-| `api.embeddingEndpoint` | `string` | `'https://api.mistral.ai/v1/embeddings'` | Endpoint pour les embeddings |
-| `local.url` | `string` | `'http://localhost:11434'` | URL du serveur Ollama |
-| `local.model` | `string` | `'mistral-7b'` | Modèle Ollama à utiliser |
-
-### Configuration Globale
-
-| Paramètre | Type | Défaut | Description |
-|-----------|------|--------|-------------|
-| `selectedFolders` | `string[]` | `[]` | Dossiers sélectionnés pour l'indexation |
-| `lastIndexation` | `string \| null` | `null` | Date de la dernière indexation |
-
----
-
-## 🔒 Sécurité
-
-### Confidentialité
-
-- **Aucun chiffrement** : Les données sont stockées en clair dans IndexedDB
-- **Stockage local** : Toutes les données restent sur la machine de l'utilisateur
-- **Consentement explicite** : L'utilisateur doit explicitement sélectionner les dossiers à indexer
-
-### Journalisation
-
-- **Logs en texte brut** : Tous les logs sont stockés en texte brut
-- **Stockage** : `browser.storage.local` (limité à 1000 logs)
-- **Export** : Possibilité d'exporter les logs vers un fichier
-
-**Niveaux de log** :
-- `INFO` : Informations générales
-- `WARN` : Avertissements
-- `ERROR` : Erreurs
-
-### Gestion des Clés API
-
-- **Stockage** : Les clés API sont stockées dans `browser.storage.local`
-- **Sécurité** : Les clés ne sont jamais envoyées à des tiers sans le consentement de l'utilisateur
-- **Configuration** : L'utilisateur doit explicitement configurer sa clé API
-
-### Permissions Thunderbird
-
-L'extension nécessite les permissions suivantes :
-
-```json
-{
-  "permissions": [
-    "accountsRead",
-    "messagesRead",
-    "messagesModify",
-    "storage",
-    "notifications",
-    "downloads"
-  ]
-}
-```
-
----
-
-## ⚡ Performances
-
-### Temps d'Indexation
-
-| Nombre d'emails | Temps estimé (machine standard) |
-|-----------------|----------------------------------|
-| 100 | < 1 minute |
-| 1 000 | 5-10 minutes |
-| 10 000 | 30-60 minutes |
-
-**Facteurs influençant les performances** :
-- Taille des emails
-- Vitesse de l'API Mistral (pour les embeddings)
-- Performances de IndexedDB
-- Ressources machine disponibles
-
-### Temps de Réponse RAG
-
-| Étape | Temps estimé |
-|-------|--------------|
-| Recherche vectorielle | 100-500ms |
-| Génération (API Mistral) | 1-3 secondes |
-| Génération (Ollama local) | 2-5 secondes |
-| **Total** | **2-8 secondes** |
-
-**Optimisations** :
-- Cache des embeddings déjà générés
-- Indexation incrémentale
-- Limitation du nombre de résultats (par défaut : 3 pour le RAG)
-
-### Benchmarks
-
-Les tests de performance peuvent être exécutés avec :
-
-```bash
-yarn test tests/performance/
-```
-
----
-
-## 🧪 Tests
-
-### Tests Unitaires
-
-**Fichiers** : `tests/unit/*.test.js`
-
-**Couverture** :
-- `helpers.js` : 100%
-- `defaultConfig.js` : 100%
-- `queryProcessor.js` : 100%
-- `embeddingService.js` : 100%
-- `apiClient.js` : 100%
-- `ollamaClient.js` : 100%
-
-**Exécution** :
-
-```bash
-# Tous les tests
-yarn test
-
-# Tests avec couverture
-yarn test:coverage
-
-# Tests en mode surveillance
-yarn test:watch
-```
-
-### Tests d'Intégration
-
-**Fichiers** : `tests/integration/*.test.js`
-
-**Scénarios testés** :
-- Flux complet d'indexation
-- Flux complet RAG
-- Interaction entre modules
-
-### Tests de Performance
-
-**Fichiers** : `tests/performance/*.test.js`
-
-**Scénarios testés** :
-- Indexation de nombreux emails
-- Recherche rapide
-- Indexation incrémentale
-
----
-
-## 🛠️ Dépannage
-
-### Problèmes Courants
-
-#### 1. Les emails ne sont pas indexés
-
-**Causes possibles** :
-- Aucun dossier sélectionné
-- Dossiers exclus (ex: Spam)
-- Emails trop grands (dépassent `maxEmailSize`)
-- Problème de connexion à l'API Mistral
-
-**Solutions** :
-- Vérifier la configuration : `selectedFolders`
-- Vérifier les dossiers exclus : `excludedFolders`
-- Vérifier la taille maximale : `maxEmailSize`
-- Vérifier la configuration des embeddings
-
-#### 2. La recherche ne retourne aucun résultat
-
-**Causes possibles** :
-- Aucun email indexé
-- Requête trop courte (< 2 caractères)
-- Problème avec les embeddings
-
-**Solutions** :
-- Vérifier que l'indexation a été exécutée
-- Vérifier la configuration des embeddings
-- Essayer une requête plus longue
-
-#### 3. Erreur API Mistral
-
-**Causes possibles** :
-- Clé API invalide
-- Endpoint incorrect
-- Problème de connexion internet
-- Quota dépassé
-
-**Solutions** :
-- Vérifier la clé API dans la configuration
-- Vérifier l'endpoint
-- Vérifier la connexion internet
-- Vérifier le quota sur le tableau de bord Mistral
-
-#### 4. Ollama ne répond pas
-
-**Causes possibles** :
-- Ollama n'est pas installé
-- Ollama n'est pas en cours d'exécution
-- URL incorrecte
-- Modèle non téléchargé
-
-**Solutions** :
-- Installer Ollama : `curl -fsSL https://ollama.ai/install.sh | sh`
-- Démarrer Ollama : `ollama serve`
-- Vérifier l'URL : `http://localhost:11434`
-- Télécharger le modèle : `ollama pull mistral-7b`
-
-### Journalisation
-
-Pour diagnostiquer les problèmes, activez les logs et exportez-les :
-
-```javascript
-// Dans la console de l'extension
-browser.runtime.sendMessage({ type: 'EXPORT_LOGS' });
-```
-
-Ou via l'interface utilisateur :
-1. Ouvrir la barre latérale de l'extension
-2. Aller dans l'onglet "Logs"
-3. Cliquer sur "Exporter les logs"
-
----
-
-## 📋 Décisions Techniques
-
-### 1. Pourquoi IndexedDB au lieu de ChromaDB ?
-
-**Raison** : ChromaDB nécessite Python et un serveur séparé, ce qui n'est pas compatible avec les extensions Thunderbird.
-
-**Avantages d'IndexedDB** :
-- ✅ Intégré au navigateur (pas de dépendance externe)
-- ✅ Compatible avec les WebExtensions
-- ✅ Persistant entre les sessions
-- ✅ Performant pour les opérations de lecture/écriture
-- ✅ Pas besoin de serveur séparé
-
-**Inconvénients** :
-- ❌ Pas de recherche vectorielle native (nécessite une implémentation manuelle)
-- ❌ Limite de stockage (selon le navigateur)
-
-### 2. Pourquoi l'API Mistral pour les Embeddings ?
-
-**Raisons** :
-- ✅ Solution simple et efficace
-- ✅ Pas besoin de modèle local (économise des ressources)
-- ✅ Modèles optimisés pour le français et l'anglais
-- ✅ API bien documentée
-
-**Alternatives envisagées** :
-- **ONNX Runtime** : Modèles locaux, mais plus complexe à intégrer
-- **TensorFlow.js** : Modèles locaux, mais taille importante
-- **TF-IDF/BM25** : Solution légère, mais moins précise
-
-### 3. Pourquoi Fetch au lieu de Axios ?
-
-**Raisons** :
-- ✅ Pas de dépendance externe nécessaire
-- ✅ API native des navigateurs modernes
-- ✅ Support natif des Promises
-- ✅ Implémentation de timeout personnalisée
-- ✅ Meilleure compatibilité avec les WebExtensions
-
-### 4. Architecture Modulaire
-
-**Avantages** :
-- ✅ Séparation claire des responsabilités
-- ✅ Facilité de maintenance
-- ✅ Testabilité accrue
-- ✅ Extensibilité
-
-**Modules** :
-- Indexation (récupération + stockage)
-- Recherche (vectorielle + mots-clés)
-- Génération (RAG + API)
-- UI (interface utilisateur)
-- Configuration (stockage + gestion)
-
----
-
-## 📖 Documentation Complémentaire
-
-- [Documentation Utilisateur](user_guide.md) - Guide d'installation et d'utilisation
-- [Guide de Contribution](contributing.md) - Comment contribuer au projet
-- [Changelog](CHANGELOG.md) - Historique des modifications
