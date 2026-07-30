@@ -217,21 +217,21 @@ export async function fetchEmailsForIndexation(selectedFolderIds, config = null)
         
         if (fullMessage) {
           emails.push({
-            id: fullMessage.id,
+            id: message.id,
             folderId: folderId,
             folderName: folderInfo.name || folderInfo.path,
-            subject: fullMessage.subject || '',
+            subject: message.subject || '',
             body: fullMessage.body || '',
-            author: fullMessage.author || fullMessage.from?.value || '',
-            recipients: fullMessage.recipients || fullMessage.to?.value ? [fullMessage.to.value] : [],
-            date: fullMessage.date ? new Date(fullMessage.date).getTime() : null,
-            lastModified: fullMessage.lastModified ? new Date(fullMessage.lastModified).getTime() : null,
-            size: fullMessage.size || 0,
-            flags: fullMessage.flags || [],
-            tags: fullMessage.tags || [],
-            read: fullMessage.read || false,
-            flagged: fullMessage.flagged || false,
-            junk: fullMessage.junk || false,
+            author: message.author || message.from?.value || '',
+            recipients: message.recipients || message.to?.value ? [message.to.value] : [],
+            date: message.date ? new Date(message.date).getTime() : null,
+            lastModified: message.lastModified ? new Date(message.lastModified).getTime() : null,
+            size: message.size || 0,
+            flags: message.flags || [],
+            tags: message.tags || [],
+            read: message.read || false,
+            flagged: message.flagged || false,
+            junk: message.junk || false,
             attachments: indexAttachments ? fullMessage.attachments || [] : [],
           });
         }
@@ -299,19 +299,19 @@ export async function fetchModifiedEmails(selectedFolderIds, lastIndexation, con
         
         if (fullMessage) {
           emails.push({
-            id: fullMessage.id,
+            id: message.id,
             folderId: folderId,
             folderName: folderInfo.name || folderInfo.path,
-            subject: fullMessage.subject || '',
+            subject: message.subject || '',
             body: fullMessage.body || '',
-            author: fullMessage.author || fullMessage.from?.value || '',
-            recipients: fullMessage.recipients || fullMessage.to?.value ? [fullMessage.to.value] : [],
-            date: fullMessage.date ? new Date(fullMessage.date).getTime() : null,
-            lastModified: fullMessage.lastModified ? new Date(fullMessage.lastModified).getTime() : null,
-            size: fullMessage.size || 0,
-            read: fullMessage.read || false,
-            flagged: fullMessage.flagged || false,
-            junk: fullMessage.junk || false,
+            author: message.author || message.from?.value || '',
+            recipients: message.recipients || message.to?.value ? [message.to.value] : [],
+            date: message.date ? new Date(message.date).getTime() : null,
+            lastModified: message.lastModified ? new Date(message.lastModified).getTime() : null,
+            size: message.size || 0,
+            read: message.read || false,
+            flagged: message.flagged || false,
+            junk: message.junk || false,
           });
         }
       }
