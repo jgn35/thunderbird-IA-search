@@ -258,6 +258,17 @@ async function handleMessage(message, sender, sendResponse) {
         sendResponse({ success: true, ...embeddingConfig });
         break;
 
+      // Messages depuis content.js
+      case 'EMAIL_CLICKED':
+        await logInfo(`Email cliqué : ${message.messageId}`);
+        sendResponse({ success: true });
+        break;
+        
+      case 'FOCUS_SEARCH':
+        await logInfo('Focus sur la recherche demandé');
+        sendResponse({ success: true });
+        break;
+
       default:
         await logWarn(`Type de message inconnu : ${message.type}`);
         sendResponse({ success: false, error: 'Type de message inconnu' });
