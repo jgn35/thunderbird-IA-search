@@ -46,38 +46,38 @@ function setupEventListeners() {
   });
 
   // Écouter les changements dans les emails
-  if (messenger.messages) {
-    messenger.messages.onNewMailReceived.addListener((folder, messages) => {
+  if (browser.messenger.messages) {
+    browser.messenger.messages.onNewMailReceived.addListener((folder, messages) => {
       // messages est un tableau, traiter chaque message
       for (const message of messages) {
         handleMessageCreated(message);
       }
     });
 
-    messenger.messages.onUpdated.addListener((message, changedProperties, oldProperties) => {
+    browser.messenger.messages.onUpdated.addListener((message, changedProperties, oldProperties) => {
       handleMessageModified(message);
     });
 
-    messenger.messages.onDeleted.addListener((messageIds) => {
+    browser.messenger.messages.onDeleted.addListener((messageIds) => {
       handleMessagesDeleted(messageIds);
     });
 
-    messenger.messages.onMoved.addListener((messageIds, sourceFolderId, destinationFolderId) => {
+    browser.messenger.messages.onMoved.addListener((messageIds, sourceFolderId, destinationFolderId) => {
       handleMessagesMoved(messageIds, sourceFolderId, destinationFolderId);
     });
   }
 
   // Écouter les changements dans les dossiers
-  if (messenger.folders) {
-    messenger.folders.onCreated.addListener((folder) => {
+  if (browser.messenger.folders) {
+    browser.messenger.folders.onCreated.addListener((folder) => {
       handleFolderCreated(folder);
     });
 
-    messenger.folders.onDeleted.addListener((folderId) => {
+    browser.messenger.folders.onDeleted.addListener((folderId) => {
       handleFolderDeleted(folderId);
     });
 
-    messenger.folders.onFolderInfoChanged.addListener((folder, folderInfo) => {
+    browser.messenger.folders.onFolderInfoChanged.addListener((folder, folderInfo) => {
       handleFolderModified(folder);
     });
   }
@@ -138,13 +138,13 @@ async function getAccountsAndFolders() {
     await logInfo('Récupération des comptes et dossiers');
     
     // Récupérer les comptes
-    const accounts = await messenger.accounts.list();
+    const accounts = await browser.messenger.accounts.list();
     
     // Récupérer tous les dossiers pour chaque compte
     let allFolders = [];
     for (const account of accounts) {
       try {
-        const folders = await messenger.folders.list(account.id);
+        const folders = await browser.messenger.folders.list(account.id);
         allFolders = allFolders.concat(folders);
       } catch (error) {
         await logError(error, `Erreur lors de la récupération des dossiers pour le compte ${account.id}`);
@@ -175,7 +175,7 @@ async function handleMessageCreated(message) {
     // Vérifier si le dossier de l'email est sélectionné pour l'indexation
     if (selectedFolders.includes(message.folderId)) {
       // Récupérer le contenu complet de l'email
-      const fullEmail = await messenger.messages.getFull(message.id);
+      const fullEmail = await browser.messenger.messages.getFull(message.id);
       
       if (fullEmail) {
         // Indexer le nouvel email
@@ -214,7 +214,7 @@ async function handleMessageModified(message) {
     // Vérifier si le dossier de l'email est sélectionné pour l'indexation
     if (selectedFolders.includes(message.folderId)) {
       // Récupérer le contenu complet de l'email
-      const fullEmail = await messenger.messages.getFull(message.id);
+      const fullEmail = await browser.messenger.messages.getFull(message.id);
       
       if (fullEmail) {
         // Réindexer l'email modifié
@@ -278,7 +278,7 @@ async function handleMessagesMoved(messageIds, sourceFolderId, destinationFolder
     for (const messageId of messageIds) {
       if (destinationSelected && !sourceSelected) {
         // L'email est déplacé vers un dossier indexé : l'indexer
-        const fullEmail = await messenger.messages.getFull(messageId);
+        const fullEmail = await browser.messenger.messages.getFull(messageId);
         if (fullEmail) {
           await indexEmail({
             id: fullEmail.id,
