@@ -4,7 +4,6 @@
  * @module modules/indexation/embeddingService
  */
 
-import axios from 'axios';
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
 import { getConfig } from '../../config/storageManager.js';
 import {
@@ -63,6 +62,30 @@ function isEmbeddingConfigValid(config) {
     config.endpoint.trim() !== '' &&
     config.apiKey && 
     config.apiKey.trim() !== '';
+}
+
+/**
+ * Effectue une requête HTTP avec timeout
+ * @param {string} url - URL de la requête
+ * @param {Object} options - Options de la requête
+ * @param {number} timeout - Timeout en ms
+ * @returns {Promise<Response>} Réponse HTTP
+ */
+async function fetchWithTimeout(url, options, timeout = DEFAULT_TIMEOUT) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
 }
 
 /**
@@ -162,19 +185,52 @@ export async function generateEmbeddings(texts, options = {}) {
 
     await logInfo(`Génération d'embeddings pour ${textsToGenerate.length} textes (modèle: ${model})`);
 
-    // Effectuer la requête
-    const response = await axios.post(
+    // Effectuer la requête avec fetch
+    const response = await fetchWithTimeout(
       `${endpoint}/embeddings`,
-      payload,
       {
+        method: 'POST',
         headers: getDefaultHeaders(apiKey),
-        timeout: DEFAULT_TIMEOUT,
+        body: JSON.stringify(payload),
       }
     );
 
     // Traiter la réponse
-    if (response.data && response.data.data && response.data.data.length > 0) {
-      const newEmbeddings = response.data.data.map(item => item.embedding);
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      let errorMessage = 'Erreur API Mistral Embeddings';
+      if (responseData && responseData.message) {
+        errorMessage = responseData.message;
+      }
+      
+      const status = response.status;
+      if (status === 401) {
+        errorMessage = 'Clé API invalide. Veuillez vérifier votre configuration.';
+      } else if (status === 404) {
+        errorMessage = 'Endpoint API introuvable. Veuillez vérifier l\'URL.';
+      } else if (status >= 500) {
+        errorMessage = 'Erreur serveur chez Mistral AI. Veuillez réessayer plus tard.';
+      }
+      
+      await logError(new Error(errorMessage), 'Génération des embeddings');
+      
+      // Stocker l'erreur dans le cache pour les textes concernés
+      if (useCache && errorMessage) {
+        for (const text of textsToGenerate) {
+          storeErrorInCache(text, errorMessage, 300000); // 5 minutes
+        }
+      }
+      
+      return {
+        success: false,
+        error: errorMessage,
+        response: responseData,
+      };
+    }
+
+    if (responseData && responseData.data && responseData.data.length > 0) {
+      const newEmbeddings = responseData.data.map(item => item.embedding);
 
       // Stocker les nouveaux embeddings dans le cache
       if (useCache) {
@@ -201,48 +257,29 @@ export async function generateEmbeddings(texts, options = {}) {
       return {
         success: true,
         embeddings: allEmbeddings,
-        model: response.data.model,
-        usage: response.data.usage,
+        model: responseData.model,
+        usage: responseData.usage,
         cached: cachedEmbeddings.length > 0,
       };
     }
 
-    await logWarn('Réponse API embeddings invalide', response.data);
+    await logWarn('Réponse API embeddings invalide', responseData);
     return {
       success: false,
       error: 'Réponse API invalide.',
-      response: response.data,
+      response: responseData,
     };
   } catch (error) {
     await logError(error, 'Génération des embeddings');
     
     let errorMessage = 'Une erreur est survenue lors de la génération des embeddings.';
     
-    if (error.response) {
-      const status = error.response.status;
-      const data = error.response.data;
-      
-      errorMessage = `Erreur API Mistral Embeddings (${status}): ${data.message || JSON.stringify(data)}`;
-      
-      if (status === 401) {
-        errorMessage = 'Clé API invalide. Veuillez vérifier votre configuration.';
-      } else if (status === 404) {
-        errorMessage = 'Endpoint API introuvable. Veuillez vérifier l\'URL.';
-      } else if (status >= 500) {
-        errorMessage = 'Erreur serveur chez Mistral AI. Veuillez réessayer plus tard.';
-      }
-      
-      // Stocker l'erreur dans le cache pour les textes concernés
-      if (useCache && error.response.data && error.response.data.message) {
-        const texts = Array.isArray(texts) ? texts : [texts];
-        for (const text of texts) {
-          storeErrorInCache(text, errorMessage, 300000); // 5 minutes
-        }
-      }
-    } else if (error.code === 'ECONNABORTED') {
+    if (error.name === 'AbortError') {
       errorMessage = 'Timeout : La requête a pris trop de temps. Veuillez réessayer.';
-    } else if (error.code === 'ENOTFOUND') {
+    } else if (error.code === 'ENOTFOUND' || error.message?.includes('Failed to fetch')) {
       errorMessage = 'Impossible de se connecter à l\'API. Vérifiez votre connexion internet.';
+    } else if (error.message) {
+      errorMessage = error.message;
     }
 
     return {

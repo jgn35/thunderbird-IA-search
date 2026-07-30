@@ -57,7 +57,7 @@ L'extension suit une **architecture modulaire** avec séparation claire des resp
 | **Langage** | JavaScript (ES6+) | - | Langage principal de l'extension |
 | **API Thunderbird** | WebExtensions | - | API pour interagir avec Thunderbird |
 | **Stockage Vectoriel** | IndexedDB | - | Base de données locale pour les embeddings |
-| **Requêtes HTTP** | Axios | ^1.6.0 | Appels API (Mistral, Ollama) |
+| **Requêtes HTTP** | Fetch API (Native) | Appels API (Mistral, Ollama) |
 | **Tests** | Jest | ^29.7.0 | Tests unitaires et d'intégration |
 | **Gestion de Projet** | Yarn | - | Gestion des dépendances |
 
@@ -700,13 +700,14 @@ Ou via l'interface utilisateur :
 - **TensorFlow.js** : Modèles locaux, mais taille importante
 - **TF-IDF/BM25** : Solution légère, mais moins précise
 
-### 3. Pourquoi Axios au lieu de Fetch ?
+### 3. Pourquoi Fetch au lieu de Axios ?
 
 **Raisons** :
-- ✅ Meilleure gestion des erreurs
-- ✅ Support des timeouts
-- ✅ Interception des requêtes
-- ✅ Compatible avec les navigateurs modernes
+- ✅ Pas de dépendance externe nécessaire
+- ✅ API native des navigateurs modernes
+- ✅ Support natif des Promises
+- ✅ Implémentation de timeout personnalisée
+- ✅ Meilleure compatibilité avec les WebExtensions
 
 ### 4. Architecture Modulaire
 
