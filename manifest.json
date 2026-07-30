@@ -18,7 +18,7 @@
     "downloads"
   ],
   "browser_action": {
-    "default_panel": "src/modules/ui/sidebar.html",
+    "default_popup": "src/modules/ui/sidebar.html",
     "default_title": "RAG Search",
     "default_icon": {
       "16": "icons/icon-16.svg",
