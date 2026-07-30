@@ -8,7 +8,7 @@
 </head>
 <body>
   <div class="sidebar-container">
-    <!-- En-tête -->
+    <!-- En-tete -->
     <div class="sidebar-header">
       <h1>RAG Search</h1>
       <p class="subtitle">Recherche intelligente dans vos emails</p>
@@ -17,7 +17,6 @@
     <!-- Onglets -->
     <div class="tabs">
       <button class="tab-button active" data-tab="search">Recherche</button>
-      <button class="tab-button" data-tab="config">Configuration</button>
       <button class="tab-button" data-tab="logs">Logs</button>
     </div>
 
@@ -94,133 +93,6 @@
           <div class="answer-meta">
             <span id="answerModel"></span>
             <span id="answerDuration"></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Onglet Configuration -->
-      <div id="config" class="tab-pane">
-        <div class="config-section">
-          <h3>Indexation</h3>
-          
-          <div class="config-group">
-            <label for="excludedFolders">Dossiers exclus:</label>
-            <input 
-              type="text" 
-              id="excludedFolders" 
-              placeholder="Spam, Trash, ..."
-            >
-            <small>Séparés par des virgules</small>
-          </div>
-
-          <div class="config-group">
-            <label>
-              <input type="checkbox" id="indexAttachments"> 
-              Indexer les pièces jointes
-            </label>
-          </div>
-
-          <div class="config-group">
-            <label for="maxEmailSize">Taille max des emails (Mo):</label>
-            <input 
-              type="number" 
-              id="maxEmailSize" 
-              min="1" 
-              max="100" 
-              value="10"
-            >
-          </div>
-
-          <div class="config-group">
-            <label for="selectedFolders">Dossiers à indexer:</label>
-            <select id="selectedFolders" multiple size="5">
-              <!-- Les dossiers seront chargés dynamiquement -->
-            </select>
-          </div>
-        </div>
-
-        <div class="config-section">
-          <h3>RAG - Configuration LLM</h3>
-          
-          <div class="llm-config">
-            <div class="config-group">
-              <label>Type de LLM:</label>
-              <select id="configLLMType">
-                <option value="api_externe">API Externe (Mistral AI)</option>
-                <option value="local">Local (Ollama)</option>
-              </select>
-            </div>
-
-            <!-- Configuration API Externe -->
-            <div id="apiConfigSection" class="llm-config-section">
-              <h4>API Externe (Mistral AI)</h4>
-              
-              <div class="config-group">
-                <label for="apiEndpoint">Endpoint:</label>
-                <input 
-                  type="text" 
-                  id="apiEndpoint" 
-                  placeholder="https://api.mistral.ai/v1"
-                >
-              </div>
-
-              <div class="config-group">
-                <label for="apiKey">Clé API:</label>
-                <input 
-                  type="password" 
-                  id="apiKey" 
-                  placeholder="Votre clé API"
-                >
-              </div>
-
-              <div class="config-group">
-                <label for="apiModel">Modèle:</label>
-                <select id="apiModel">
-                  <option value="mistral-tiny">mistral-tiny</option>
-                  <option value="mistral-small">mistral-small</option>
-                  <option value="mistral-medium">mistral-medium</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Configuration Ollama -->
-            <div id="ollamaConfigSection" class="llm-config-section" style="display: none;">
-              <h4>Local (Ollama)</h4>
-              
-              <div class="config-group">
-                <label for="ollamaUrl">URL du serveur:</label>
-                <input 
-                  type="text" 
-                  id="ollamaUrl" 
-                  placeholder="http://localhost:11434"
-                >
-              </div>
-
-              <div class="config-group">
-                <label for="ollamaModel">Modèle:</label>
-                <input 
-                  type="text" 
-                  id="ollamaModel" 
-                  placeholder="mistral-7b"
-                >
-              </div>
-
-              <div class="config-group">
-                <button id="checkOllamaStatus" class="btn btn-small">
-                  Vérifier le statut
-                </button>
-                <span id="ollamaStatus"></span>
-              </div>
-            </div>
-          </div>
-
-          <div class="config-actions">
-            <button id="saveConfigButton" class="btn btn-primary">
-              Sauvegarder la configuration
-            </button>
-            <button id="resetConfigButton" class="btn btn-secondary">
-              Réinitialiser
-            </button>
           </div>
         </div>
       </div>
