@@ -46,35 +46,35 @@ function setupEventListeners() {
   });
 
   // Écouter les changements dans les emails
-  if (messenger.messages) {
-    messenger.messages.onCreated.addListener((message) => {
+  if (browser.messages) {
+    browser.messages.onCreated.addListener((message) => {
       handleMessageCreated(message);
     });
 
-    messenger.messages.onModified.addListener((message) => {
+    browser.messages.onModified.addListener((message) => {
       handleMessageModified(message);
     });
 
-    messenger.messages.onDeleted.addListener((messageIds) => {
+    browser.messages.onDeleted.addListener((messageIds) => {
       handleMessagesDeleted(messageIds);
     });
 
-    messenger.messages.onMoved.addListener((messageIds, sourceFolderId, destinationFolderId) => {
+    browser.messages.onMoved.addListener((messageIds, sourceFolderId, destinationFolderId) => {
       handleMessagesMoved(messageIds, sourceFolderId, destinationFolderId);
     });
   }
 
   // Écouter les changements dans les dossiers
-  if (messenger.folders) {
-    messenger.folders.onCreated.addListener((folder) => {
+  if (browser.folders) {
+    browser.folders.onCreated.addListener((folder) => {
       handleFolderCreated(folder);
     });
 
-    messenger.folders.onDeleted.addListener((folderId) => {
+    browser.folders.onDeleted.addListener((folderId) => {
       handleFolderDeleted(folderId);
     });
 
-    messenger.folders.onModified.addListener((folder) => {
+    browser.folders.onModified.addListener((folder) => {
       handleFolderModified(folder);
     });
   }
@@ -135,13 +135,13 @@ async function getAccountsAndFolders() {
     await logInfo('Récupération des comptes et dossiers');
     
     // Récupérer les comptes
-    const accounts = await messenger.accounts.list();
+    const accounts = await browser.accounts.list();
     
     // Récupérer tous les dossiers pour chaque compte
     let allFolders = [];
     for (const account of accounts) {
       try {
-        const folders = await messenger.folders.list(account.id);
+        const folders = await browser.folders.list(account.id);
         allFolders = allFolders.concat(folders);
       } catch (error) {
         await logError(error, `Erreur lors de la récupération des dossiers pour le compte ${account.id}`);
@@ -172,7 +172,7 @@ async function handleMessageCreated(message) {
     // Vérifier si le dossier de l'email est sélectionné pour l'indexation
     if (selectedFolders.includes(message.folderId)) {
       // Récupérer le contenu complet de l'email
-      const fullEmail = await messenger.messages.getFull(message.id);
+      const fullEmail = await browser.messages.getFull(message.id);
       
       if (fullEmail) {
         // Indexer le nouvel email
@@ -211,7 +211,7 @@ async function handleMessageModified(message) {
     // Vérifier si le dossier de l'email est sélectionné pour l'indexation
     if (selectedFolders.includes(message.folderId)) {
       // Récupérer le contenu complet de l'email
-      const fullEmail = await messenger.messages.getFull(message.id);
+      const fullEmail = await browser.messages.getFull(message.id);
       
       if (fullEmail) {
         // Réindexer l'email modifié
@@ -275,7 +275,7 @@ async function handleMessagesMoved(messageIds, sourceFolderId, destinationFolder
     for (const messageId of messageIds) {
       if (destinationSelected && !sourceSelected) {
         // L'email est déplacé vers un dossier indexé : l'indexer
-        const fullEmail = await messenger.messages.getFull(messageId);
+        const fullEmail = await browser.messages.getFull(messageId);
         if (fullEmail) {
           await indexEmail({
             id: fullEmail.id,

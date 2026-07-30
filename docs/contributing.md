@@ -418,7 +418,7 @@ Les emails modifiés n'étaient pas réindexés automatiquement.
 Ajout d'un écouteur d'événements pour détecter les modifications d'emails et déclencher une réindexation.
 
 ### Modifications
-- `src/background.js` : Ajout de l'écouteur `messenger.messages.onModified`
+- `src/background.js` : Ajout de l'écouteur `browser.messages.onModified`
 - `src/modules/indexation/indexer.js` : Ajout de la fonction `reindexModifiedEmail`
 
 ### Tests
