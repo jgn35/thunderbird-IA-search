@@ -14,11 +14,92 @@ import {
 } from './modules/indexation/indexer.js';
 
 /**
+ * Vérifie si l'API Thunderbird messenger est disponible
+ * Dans Thunderbird, on utilise browser.messenger ou browser (selon la version)
+ * @returns {boolean}
+ */
+function isMessengerAPIAvailable() {
+  // Vérifier browser.messenger (API moderne)
+  if (typeof browser !== 'undefined' && 
+      browser && 
+      browser.messenger && 
+      typeof browser.messenger === 'object') {
+    return true;
+  }
+  
+  // Vérifier browser directement (certaines versions de Thunderbird)
+  if (typeof browser !== 'undefined' && 
+      browser && 
+      browser.accounts && 
+      browser.folders) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Récupère les comptes via l'API disponible
+ * @returns {Promise<Array>}
+ */
+async function getAccounts() {
+  try {
+    // Essayer browser.messenger.accounts (API moderne)
+    if (browser.messenger && browser.messenger.accounts) {
+      return await browser.messenger.accounts.list();
+    }
+    
+    // Essayer browser.accounts (API alternative)
+    if (browser.accounts) {
+      return await browser.accounts.list();
+    }
+    
+    await logWarn('Aucune API de comptes disponible');
+    return [];
+  } catch (error) {
+    await logError(error, 'Récupération des comptes');
+    return [];
+  }
+}
+
+/**
+ * Récupère les dossiers pour un compte
+ * @param {string} accountId - ID du compte
+ * @returns {Promise<Array>}
+ */
+async function getFoldersForAccount(accountId) {
+  try {
+    // Essayer browser.messenger.folders (API moderne)
+    if (browser.messenger && browser.messenger.folders) {
+      return await browser.messenger.folders.list(accountId);
+    }
+    
+    // Essayer browser.folders (API alternative)
+    if (browser.folders) {
+      return await browser.folders.list(accountId);
+    }
+    
+    await logWarn(`Aucune API de dossiers disponible pour le compte ${accountId}`);
+    return [];
+  } catch (error) {
+    await logError(error, `Récupération des dossiers pour le compte ${accountId}`);
+    return [];
+  }
+}
+
+/**
  * Initialise le script de fond
  */
 async function initBackground() {
   try {
     await logInfo('Initialisation du script de fond');
+    
+    // Vérifier la disponibilité de l'API messenger au démarrage
+    if (isMessengerAPIAvailable()) {
+      await logInfo('API messenger est disponible dans le background script');
+    } else {
+      await logWarn('API messenger NON disponible dans le background script');
+    }
     
     // Initialiser l'indexeur
     await initIndexer();
@@ -40,17 +121,21 @@ async function initBackground() {
  */
 function setupEventListeners() {
   // Écouter les messages des autres parties de l'extension
-  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    handleMessage(message, sender, sendResponse);
-    return true; // Indique que sendResponse sera appelé de manière asynchrone
-  });
+  if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.onMessage) {
+    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      handleMessage(message, sender, sendResponse);
+      return true; // Indique que sendResponse sera appelé de manière asynchrone
+    });
+  }
 
   // Écouter les changements dans les emails
-  if (browser.messenger.messages) {
+  // Ces écouteurs ne fonctionnent que dans le background script avec l'API messenger disponible
+  if (browser.messenger && browser.messenger.messages) {
     browser.messenger.messages.onNewMailReceived.addListener((folder, messages) => {
-      // messages est un tableau, traiter chaque message
-      for (const message of messages) {
-        handleMessageCreated(message);
+      if (Array.isArray(messages)) {
+        for (const message of messages) {
+          handleMessageCreated(message);
+        }
       }
     });
 
@@ -68,7 +153,7 @@ function setupEventListeners() {
   }
 
   // Écouter les changements dans les dossiers
-  if (browser.messenger.folders) {
+  if (browser.messenger && browser.messenger.folders) {
     browser.messenger.folders.onCreated.addListener((folder) => {
       handleFolderCreated(folder);
     });
@@ -131,6 +216,7 @@ async function handleMessage(message, sender, sendResponse) {
 
 /**
  * Récupère les comptes et dossiers
+ * Utilise les fonctions helper pour gérer les différentes APIs
  * @returns {Promise<Object>} Objet contenant les comptes et dossiers
  */
 async function getAccountsAndFolders() {
@@ -138,13 +224,18 @@ async function getAccountsAndFolders() {
     await logInfo('Récupération des comptes et dossiers');
     
     // Récupérer les comptes
-    const accounts = await browser.messenger.accounts.list();
+    const accounts = await getAccounts();
+    
+    if (accounts.length === 0) {
+      await logWarn('Aucun compte trouvé - vérifiez les permissions dans manifest.json');
+      return { accounts: [], folders: [] };
+    }
     
     // Récupérer tous les dossiers pour chaque compte
     let allFolders = [];
     for (const account of accounts) {
       try {
-        const folders = await browser.messenger.folders.list(account.id);
+        const folders = await getFoldersForAccount(account.id);
         allFolders = allFolders.concat(folders);
       } catch (error) {
         await logError(error, `Erreur lors de la récupération des dossiers pour le compte ${account.id}`);
@@ -175,7 +266,7 @@ async function handleMessageCreated(message) {
     // Vérifier si le dossier de l'email est sélectionné pour l'indexation
     if (selectedFolders.includes(message.folderId)) {
       // Récupérer le contenu complet de l'email
-      const fullEmail = await browser.messenger.messages.getFull(message.id);
+      const fullEmail = await getFullEmail(message.id);
       
       if (fullEmail) {
         // Indexer le nouvel email
@@ -200,6 +291,26 @@ async function handleMessageCreated(message) {
 }
 
 /**
+ * Récupère un email complet
+ * @param {string} messageId - ID de l'email
+ * @returns {Promise<Object|null>}
+ */
+async function getFullEmail(messageId) {
+  try {
+    if (browser.messenger && browser.messenger.messages) {
+      return await browser.messenger.messages.getFull(messageId);
+    }
+    if (browser.messages) {
+      return await browser.messages.getFull(messageId);
+    }
+    return null;
+  } catch (error) {
+    await logError(error, `Récupération de l'email ${messageId}`);
+    return null;
+  }
+}
+
+/**
  * Gère la modification d'un email
  * @param {Object} message - L'email modifié
  */
@@ -214,7 +325,7 @@ async function handleMessageModified(message) {
     // Vérifier si le dossier de l'email est sélectionné pour l'indexation
     if (selectedFolders.includes(message.folderId)) {
       // Récupérer le contenu complet de l'email
-      const fullEmail = await browser.messenger.messages.getFull(message.id);
+      const fullEmail = await getFullEmail(message.id);
       
       if (fullEmail) {
         // Réindexer l'email modifié
@@ -278,7 +389,7 @@ async function handleMessagesMoved(messageIds, sourceFolderId, destinationFolder
     for (const messageId of messageIds) {
       if (destinationSelected && !sourceSelected) {
         // L'email est déplacé vers un dossier indexé : l'indexer
-        const fullEmail = await browser.messenger.messages.getFull(messageId);
+        const fullEmail = await getFullEmail(messageId);
         if (fullEmail) {
           await indexEmail({
             id: fullEmail.id,
@@ -296,7 +407,6 @@ async function handleMessagesMoved(messageIds, sourceFolderId, destinationFolder
         // L'email est déplacé hors d'un dossier indexé : le désindexer
         await unindexEmail(messageId);
       }
-      // Si les deux dossiers sont indexés ou aucun ne l'est, pas besoin de faire quoi que ce soit
     }
     
     await logInfo(`Emails traités après déplacement : ${messageIds.length}`);
@@ -318,8 +428,6 @@ async function handleFolderCreated(folder) {
     const selectedFolders = config.selectedFolders || [];
     
     if (selectedFolders.includes(folder.id)) {
-      // Indexer tous les emails du nouveau dossier
-      // (L'indexation complète sera gérée par l'interface utilisateur)
       await logInfo(`Nouveau dossier sélectionné pour l'indexation : ${folder.name}`);
     }
   } catch (error) {
@@ -334,7 +442,6 @@ async function handleFolderCreated(folder) {
 async function handleFolderDeleted(folderId) {
   try {
     await logInfo(`Dossier supprimé : ${folderId}`);
-    
     // Désindexer tous les emails du dossier supprimé
     // (Cela sera géré par la suppression des emails individuels)
   } catch (error) {
@@ -349,7 +456,6 @@ async function handleFolderDeleted(folderId) {
 async function handleFolderModified(folder) {
   try {
     await logInfo(`Dossier modifié : ${folder.id} (${folder.name})`);
-    
     // Si le nom du dossier a changé, mettre à jour l'index
     // (Cela sera géré par la réindexation des emails)
   } catch (error) {

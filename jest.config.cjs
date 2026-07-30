@@ -15,7 +15,7 @@ module.exports = {
     '^.+\\.js$': 'babel-jest',
   },
   moduleNameMapper: {
-    '^(\.{1,2}/.*)\.js$': '$1',
+    '^(\.{1,2}/.*)\\.js$': '$1',
   },
   testTimeout: 10000,
   forceExit: true,
