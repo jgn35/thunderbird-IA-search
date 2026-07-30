@@ -158,7 +158,7 @@ thunderbird-rag-extension/
  * @module modules/indexation/embeddingService
  */
 
-import axios from 'axios';
+// Utilisation de fetch API native
 import { logInfo, logError } from '../../utils/logger.js';
 
 /**
@@ -522,7 +522,7 @@ Ajout d'un écouteur d'événements pour détecter les modifications d'emails et
     * @module modules/generation/nouveauLLMClient
     */
 
-   import axios from 'axios';
+   // Utilisation de fetch API native
    import { logInfo, logError } from '../../utils/logger.js';
    import { getConfig } from '../../config/storageManager.js';
 

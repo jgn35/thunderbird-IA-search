@@ -3,7 +3,6 @@
  * @module modules/generation/ollamaClient
  */
 
-import axios from 'axios';
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
 import { getConfig } from '../../config/storageManager.js';
 
@@ -35,6 +34,30 @@ function isOllamaConfigValid(config) {
     config.url.trim() !== '' &&
     config.model && 
     config.model.trim() !== '';
+}
+
+/**
+ * Effectue une requête HTTP avec timeout
+ * @param {string} url - URL de la requête
+ * @param {Object} options - Options de la requête
+ * @param {number} timeout - Timeout en ms
+ * @returns {Promise<Response>} Réponse HTTP
+ */
+async function fetchWithTimeout(url, options, timeout = DEFAULT_TIMEOUT) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
 }
 
 /**
@@ -85,65 +108,78 @@ export async function callOllamaAPI(prompt, options = {}) {
 
     await logInfo(`Appel API Ollama : url=${url}, model=${modelName}`);
 
-    // Effectuer la requête
-    const response = await axios.post(
+    // Effectuer la requête avec fetch
+    const response = await fetchWithTimeout(
       `${url}/api/generate`,
-      payload,
       {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: DEFAULT_TIMEOUT,
+        body: JSON.stringify(payload),
       }
     );
 
     // Traiter la réponse
-    if (response.data && response.data.response) {
-      const generatedText = response.data.response;
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      let errorMessage = 'Erreur API Ollama';
+      if (responseData && responseData.error) {
+        errorMessage = responseData.error;
+      }
+      
+      const status = response.status;
+      if (status === 404) {
+        errorMessage = 'Modèle introuvable. Vérifiez le nom du modèle.';
+      } else if (status === 500) {
+        errorMessage = 'Erreur serveur Ollama. Vérifiez que Ollama est en cours d\'exécution.';
+      }
+      
+      await logError(new Error(errorMessage), 'Appel API Ollama');
+      return {
+        success: false,
+        error: errorMessage,
+        status,
+      };
+    }
+
+    if (responseData && responseData.response) {
+      const generatedText = responseData.response;
 
       await logInfo('Réponse API Ollama reçue avec succès');
 
       return {
         success: true,
         text: generatedText,
-        model: response.data.model,
-        done: response.data.done,
-        totalDuration: response.data.total_duration,
-        loadDuration: response.data.load_duration,
-        promptEvalCount: response.data.prompt_eval_count,
-        evalCount: response.data.eval_count,
+        model: responseData.model,
+        done: responseData.done,
+        totalDuration: responseData.total_duration,
+        loadDuration: responseData.load_duration,
+        promptEvalCount: responseData.prompt_eval_count,
+        evalCount: responseData.eval_count,
       };
     }
 
-    await logWarn('Réponse API Ollama invalide', response.data);
+    await logWarn('Réponse API Ollama invalide', responseData);
     return {
       success: false,
       error: 'Réponse API invalide.',
-      response: response.data,
+      response: responseData,
     };
   } catch (error) {
     await logError(error, 'Appel API Ollama');
     
     let errorMessage = 'Une erreur est survenue lors de l\'appel à Ollama.';
     
-    if (error.response) {
-      // Erreur avec réponse du serveur
-      const status = error.response.status;
-      const data = error.response.data;
-      
-      errorMessage = `Erreur API Ollama (${status}): ${data.error || JSON.stringify(data)}`;
-      
-      if (status === 404) {
-        errorMessage = 'Modèle introuvable. Vérifiez le nom du modèle.';
-      } else if (status === 500) {
-        errorMessage = 'Erreur serveur Ollama. Vérifiez que Ollama est en cours d\'exécution.';
-      }
-    } else if (error.code === 'ECONNABORTED') {
+    if (error.name === 'AbortError') {
       errorMessage = 'Timeout : La requête a pris trop de temps. Ollama peut être lent à démarrer.';
-    } else if (error.code === 'ECONNREFUSED') {
+    } else if (error.code === 'ECONNREFUSED' || error.message?.includes('connection refused')) {
       errorMessage = 'Impossible de se connecter à Ollama. Vérifiez que le serveur est en cours d\'exécution.';
-    } else if (error.code === 'ENOTFOUND') {
+    } else if (error.code === 'ENOTFOUND' || error.message?.includes('Failed to fetch')) {
       errorMessage = 'URL Ollama introuvable. Vérifiez l\'adresse.';
+    } else if (error.message) {
+      errorMessage = error.message;
     }
 
     return {
@@ -308,23 +344,32 @@ export async function checkOllamaStatus() {
 
     try {
       // Essayer de lister les modèles (endpoint simple pour vérifier si Ollama répond)
-      const response = await axios.get(
+      const response = await fetchWithTimeout(
         `${url}/api/tags`,
         {
-          timeout: 5000, // Timeout court pour la vérification
-        }
+          method: 'GET',
+        },
+        5000 // Timeout court pour la vérification
       );
 
-      if (response.data && response.data.models) {
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData && responseData.models) {
+          return {
+            isRunning: true,
+            models: responseData.models,
+          };
+        }
+
         return {
           isRunning: true,
-          models: response.data.models,
+          models: [],
         };
       }
 
       return {
-        isRunning: true,
-        models: [],
+        isRunning: false,
+        error: `Erreur ${response.status} : Impossible de se connecter à Ollama.`,
       };
     } catch (error) {
       return {
@@ -358,15 +403,23 @@ export async function getAvailableModels() {
       ? ollamaConfig.url.slice(0, -1) 
       : ollamaConfig.url;
 
-    const response = await axios.get(
+    const response = await fetchWithTimeout(
       `${url}/api/tags`,
       {
-        timeout: 10000,
-      }
+        method: 'GET',
+      },
+      10000
     );
 
-    if (response.data && response.data.models) {
-      return response.data.models.map(model => model.name);
+    if (!response.ok) {
+      await logError(new Error(`Erreur ${response.status}`), 'Récupération des modèles Ollama');
+      return [];
+    }
+
+    const responseData = await response.json();
+    
+    if (responseData && responseData.models) {
+      return responseData.models.map(model => model.name);
     }
 
     return [];

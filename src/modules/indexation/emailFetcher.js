@@ -13,7 +13,7 @@ import { getConfig } from '../../config/storageManager.js';
  */
 export async function getAccounts() {
   try {
-    const accounts = await browser.accounts.list();
+    const accounts = await browser.messenger.accounts.list();
     await logInfo(`Récupération de ${accounts.length} comptes email`);
     return accounts;
   } catch (error) {
@@ -29,7 +29,7 @@ export async function getAccounts() {
  */
 export async function getFolders(accountId) {
   try {
-    const folders = await browser.folders.list(accountId);
+    const folders = await browser.messenger.folders.list(accountId);
     await logInfo(`Récupération de ${folders.length} dossiers pour le compte ${accountId}`);
     return folders;
   } catch (error) {
@@ -50,7 +50,7 @@ export async function getEmails(folderId, options = {}) {
   const { limit = 50, offset = 0 } = options;
   
   try {
-    const messages = await browser.messages.list(folderId, {
+    const messages = await browser.messenger.messages.list(folderId, {
       limit,
       offset,
     });
@@ -74,7 +74,7 @@ export async function getEmails(folderId, options = {}) {
  */
 export async function getFullEmail(messageId) {
   try {
-    const message = await browser.messages.getFull(messageId);
+    const message = await browser.messenger.messages.getFull(messageId);
     return message;
   } catch (error) {
     await logError(error, `Récupération de l'email ${messageId}`);
@@ -101,7 +101,7 @@ export async function fetchEmailsForIndexation(selectedFolderIds, config = null)
   for (const folderId of selectedFolderIds) {
     try {
       // Récupérer les informations du dossier pour vérifier s'il est exclu
-      const folderInfo = await browser.folders.get(folderId);
+      const folderInfo = await browser.messenger.folders.get(folderId);
       
       if (isFolderExcluded(folderInfo.name, excludedFolders)) {
         await logWarn(`Dossier exclu : ${folderInfo.name} (ID: ${folderId})`);
@@ -191,7 +191,7 @@ export async function fetchModifiedEmails(selectedFolderIds, lastIndexation, con
 
   for (const folderId of selectedFolderIds) {
     try {
-      const folderInfo = await browser.folders.get(folderId);
+      const folderInfo = await browser.messenger.folders.get(folderId);
       
       if (isFolderExcluded(folderInfo.name, excludedFolders)) {
         continue;
@@ -260,7 +260,7 @@ export async function fetchModifiedEmails(selectedFolderIds, lastIndexation, con
  */
 export async function emailExists(messageId) {
   try {
-    const message = await browser.messages.get(messageId);
+    const message = await browser.messenger.messages.get(messageId);
     return !!message;
   } catch (error) {
     return false;

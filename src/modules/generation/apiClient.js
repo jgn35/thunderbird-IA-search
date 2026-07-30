@@ -3,7 +3,6 @@
  * @module modules/generation/apiClient
  */
 
-import axios from 'axios';
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
 import { getConfig } from '../../config/storageManager.js';
 
@@ -47,6 +46,30 @@ function isApiConfigValid(config) {
     config.endpoint.trim() !== '' &&
     config.apiKey && 
     config.apiKey.trim() !== '';
+}
+
+/**
+ * Effectue une requête HTTP avec timeout
+ * @param {string} url - URL de la requête
+ * @param {Object} options - Options de la requête
+ * @param {number} timeout - Timeout en ms
+ * @returns {Promise<Response>} Réponse HTTP
+ */
+async function fetchWithTimeout(url, options, timeout = DEFAULT_TIMEOUT) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
 }
 
 /**
@@ -101,49 +124,28 @@ export async function callMistralAPI(prompt, options = {}) {
 
     await logInfo(`Appel API Mistral : endpoint=${endpoint}, model=${model}`);
 
-    // Effectuer la requête
-    const response = await axios.post(
+    // Effectuer la requête avec fetch
+    const response = await fetchWithTimeout(
       `${endpoint}/chat/completions`,
-      payload,
       {
+        method: 'POST',
         headers: getDefaultHeaders(apiKey),
-        timeout: DEFAULT_TIMEOUT,
+        body: JSON.stringify(payload),
       }
     );
 
     // Traiter la réponse
-    if (response.data && response.data.choices && response.data.choices.length > 0) {
-      const choice = response.data.choices[0];
-      const generatedText = choice.message?.content || '';
-
-      await logInfo('Réponse API Mistral reçue avec succès');
-
-      return {
-        success: true,
-        text: generatedText,
-        model: response.data.model,
-        usage: response.data.usage,
-      };
-    }
-
-    await logWarn('Réponse API Mistral invalide', response.data);
-    return {
-      success: false,
-      error: 'Réponse API invalide.',
-      response: response.data,
-    };
-  } catch (error) {
-    await logError(error, 'Appel API Mistral');
+    const responseData = await response.json();
     
-    let errorMessage = 'Une erreur est survenue lors de l\'appel à l\'API Mistral.';
-    
-    if (error.response) {
-      // Erreur avec réponse du serveur
-      const status = error.response.status;
-      const data = error.response.data;
+    if (!response.ok) {
+      let errorMessage = 'Erreur API Mistral';
+      if (responseData && responseData.message) {
+        errorMessage = responseData.message;
+      } else if (responseData && responseData.error) {
+        errorMessage = responseData.error;
+      }
       
-      errorMessage = `Erreur API Mistral (${status}): ${data.message || JSON.stringify(data)}`;
-      
+      const status = response.status;
       if (status === 401) {
         errorMessage = 'Clé API invalide. Veuillez vérifier votre configuration.';
       } else if (status === 404) {
@@ -151,10 +153,46 @@ export async function callMistralAPI(prompt, options = {}) {
       } else if (status >= 500) {
         errorMessage = 'Erreur serveur chez Mistral AI. Veuillez réessayer plus tard.';
       }
-    } else if (error.code === 'ECONNABORTED') {
+      
+      await logError(new Error(errorMessage), 'Appel API Mistral');
+      return {
+        success: false,
+        error: errorMessage,
+        status,
+      };
+    }
+
+    if (responseData && responseData.choices && responseData.choices.length > 0) {
+      const choice = responseData.choices[0];
+      const generatedText = choice.message?.content || '';
+
+      await logInfo('Réponse API Mistral reçue avec succès');
+
+      return {
+        success: true,
+        text: generatedText,
+        model: responseData.model,
+        usage: responseData.usage,
+      };
+    }
+
+    await logWarn('Réponse API Mistral invalide', responseData);
+    return {
+      success: false,
+      error: 'Réponse API invalide.',
+      response: responseData,
+    };
+  } catch (error) {
+    await logError(error, 'Appel API Mistral');
+    
+    let errorMessage = 'Une erreur est survenue lors de l\'appel à l\'API Mistral.';
+    
+    if (error.name === 'AbortError') {
       errorMessage = 'Timeout : La requête a pris trop de temps. Veuillez réessayer.';
-    } else if (error.code === 'ENOTFOUND') {
+    } else if (error.code === 'ENOTFOUND' || error.message?.includes('Failed to fetch')) {
       errorMessage = 'Impossible de se connecter à l\'API. Vérifiez votre connexion internet.';
+    } else if (error.message) {
+      errorMessage = error.message;
     }
 
     return {
@@ -315,16 +353,23 @@ export async function getAvailableModels() {
       : apiConfig.endpoint;
     const apiKey = apiConfig.apiKey;
 
-    const response = await axios.get(
+    const response = await fetchWithTimeout(
       `${endpoint}/models`,
       {
+        method: 'GET',
         headers: getDefaultHeaders(apiKey),
-        timeout: DEFAULT_TIMEOUT,
       }
     );
 
-    if (response.data && response.data.data) {
-      return response.data.data.map(model => model.id);
+    if (!response.ok) {
+      await logError(new Error(`Erreur ${response.status}`), 'Récupération des modèles');
+      return [];
+    }
+
+    const responseData = await response.json();
+    
+    if (responseData && responseData.data) {
+      return responseData.data.map(model => model.id);
     }
 
     return [];

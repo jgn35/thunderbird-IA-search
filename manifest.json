@@ -17,35 +17,35 @@
     "notifications",
     "downloads"
   ],
-  "sidebar_action": {
-    "default_panel": "src/modules/ui/sidebar.html",
+  "browser_action": {
+    "default_popup": "dist/sidebar.html",
     "default_title": "RAG Search",
     "default_icon": {
-      "16": "icons/icon-16.png",
-      "32": "icons/icon-32.png",
-      "48": "icons/icon-48.png",
-      "64": "icons/icon-64.png"
+      "16": "icons/icon-16.svg",
+      "32": "icons/icon-32.svg",
+      "48": "icons/icon-48.svg",
+      "64": "icons/icon-64.svg"
     }
   },
   "options_ui": {
-    "page": "src/modules/ui/options.html",
+    "page": "dist/options.html",
     "open_in_tab": true,
     "browser_style": true
   },
   "icons": {
-    "16": "icons/icon-16.png",
-    "32": "icons/icon-32.png",
-    "48": "icons/icon-48.png",
-    "64": "icons/icon-64.png"
+    "16": "icons/icon-16.svg",
+    "32": "icons/icon-32.svg",
+    "48": "icons/icon-48.svg",
+    "64": "icons/icon-64.svg"
   },
   "background": {
-    "scripts": ["src/background.js"],
+    "scripts": ["dist/background.js"],
     "persistent": false
   },
   "content_scripts": [
     {
       "matches": ["*://*.thunderbird.net/*"],
-      "js": ["src/content.js"]
+      "js": ["dist/content.js"]
     }
   ]
 }
