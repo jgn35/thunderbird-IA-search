@@ -15,8 +15,8 @@ import {
   getConfig,
   saveConfig,
   resetConfig,
-  getDefaultConfig,
 } from '../../config/storageManager.js';
+import { getDefaultConfig } from '../../config/defaultConfig.js';
 
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
 

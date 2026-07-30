@@ -30,8 +30,8 @@ import {
   resetConfig,
   getLogs,
   clearLogs,
-  exportLogsToFile,
 } from '../../config/storageManager.js';
+import { exportLogsToFile } from '../../utils/logger.js';
 
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
 

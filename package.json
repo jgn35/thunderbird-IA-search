@@ -2,14 +2,17 @@
   "name": "thunderbird-rag-extension",
   "version": "1.0.0",
   "description": "Extension Thunderbird pour indexation et recherche RAG avec IndexedDB et LLM (Mistral/Ollama)",
-  "main": "src/modules/ui/sidebar.js",
+  "type": "module",
+  "main": "dist/background.js",
   "scripts": {
     "test": "jest --detectOpenHandles",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --detectOpenHandles",
     "lint": "echo \"Linting not configured yet\"",
     "dev": "web-ext run",
-    "build": "web-ext build"
+    "build": "node scripts/build.js && web-ext build",
+    "build:scripts": "node scripts/build.js",
+    "watch": "node scripts/build.js --watch"
   },
   "keywords": [
     "thunderbird",
@@ -27,6 +30,7 @@
   "devDependencies": {
     "@babel/preset-env": "^8.0.2",
     "babel-jest": "^30.4.1",
+    "esbuild": "^0.23.0",
     "jest": "^29.7.0",
     "jest-environment-node": "^29.7.0",
     "web-ext": "^10.5.0"
