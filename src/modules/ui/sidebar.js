@@ -98,7 +98,7 @@ async function loadAccountsAndFolders() {
     showLoading('Chargement des comptes et dossiers...');
     
     // Envoyer un message au background script pour récupérer les comptes et dossiers
-    const response = await browser.runtime.sendMessage({ type: 'GET_ACCOUNTS_AND_FOLDERS' });
+    const response = await messenger.runtime.sendMessage({ type: 'GET_ACCOUNTS_AND_FOLDERS' });
     
     if (response && response.success) {
       appState.accounts = response.accounts || [];

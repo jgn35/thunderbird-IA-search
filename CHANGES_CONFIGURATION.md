@@ -150,7 +150,7 @@ Tests ajoutés pour valider :
 Les utilisateurs existants n'ont **aucune action à effectuer** :
 - Leur configuration actuelle sera automatiquement chargée
 - Les nouveaux paramètres auront leurs valeurs par défaut
-- La configuration est stockée dans `browser.storage.local` comme avant
+- La configuration est stockée dans `messenger.storage.local` comme avant
 
 ## Fichiers modifiés
 

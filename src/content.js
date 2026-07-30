@@ -55,7 +55,7 @@ function handleClick(e) {
         logInfo(`Clic sur l'email : ${messageId}`);
         
         // Envoyer un message au script de fond si nécessaire
-        browser.runtime.sendMessage({
+        messenger.runtime.sendMessage({
           type: 'EMAIL_CLICKED',
           messageId,
         }).catch(error => {
@@ -80,7 +80,7 @@ function handleKeyDown(e) {
       e.preventDefault();
       logInfo('Raccourci Ctrl+F détecté');
       
-      browser.runtime.sendMessage({
+      messenger.runtime.sendMessage({
         type: 'FOCUS_SEARCH',
       }).catch(error => {
         logError(error, 'Envoi du message FOCUS_SEARCH');
