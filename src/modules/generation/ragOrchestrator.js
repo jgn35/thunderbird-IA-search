@@ -219,7 +219,7 @@ export async function summarizeConversation(emailIds, options = {}) {
     const emails = [];
     for (const emailId of emailIds) {
       try {
-        const email = await browser.messages.getFull(emailId);
+        const email = await messenger.messages.getFull(emailId);
         if (email) {
           emails.push(email);
         }
