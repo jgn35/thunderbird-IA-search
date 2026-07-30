@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Fond circulaire bleu -->
+  <circle cx="32" cy="32" r="28" fill="#1e88e5"/>
+  
+  <!-- Loupe (recherche) -->
+  <circle cx="18" cy="18" r="5" fill="none" stroke="white" stroke-width="2.5"/>
+  <line x1="22" y1="22" x2="32" y2="32" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Étoile (IA) - plus détaillée -->
+  <path d="M42 12 L48 22 L58 22 L52 28 L54 38 L42 32 L30 38 L32 28 L26 22 L36 22 Z" fill="#ffd700"/>
+  
+  <!-- Enveloppe (messages) -->
+  <rect x="10" y="34" width="44" height="20" fill="none" stroke="white" stroke-width="2.5"/>
+  <path d="M10 34 L32 48 L54 34" fill="none" stroke="white" stroke-width="2.5"/>
+</svg>
