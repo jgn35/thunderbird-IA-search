@@ -32,13 +32,13 @@ jobs:
 
       - name: Renommer le fichier en .xpi
         run: |
-          mv web-ext-artifacts/*.zip web-ext-artifacts/thunderbird_rag_search-1.0.0.xpi
+          mv web-ext-artifacts/*.zip web-ext-artifacts/thunderbird_rag_search-${{ github.event.release.tag_name || '1.0.0' }}.xpi
 
       - name: Télécharger l'artefact XPI
         uses: actions/upload-artifact@v4
         with:
           name: thunderbird-rag-search-xpi
-          path: web-ext-artifacts/thunderbird_rag_search-1.0.0.xpi
+          path: web-ext-artifacts/thunderbird_rag_search-${{ github.event.release.tag_name || '1.0.0' }}.xpi
           retention-days: 30
 
       - name: Publier l'artefact dans la release (si release)
@@ -48,6 +48,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: web-ext-artifacts/thunderbird_rag_search-1.0.0.xpi
-          asset_name: thunderbird_rag_search-1.0.0.xpi
+          asset_path: web-ext-artifacts/thunderbird_rag_search-${{ github.event.release.tag_name || '1.0.0' }}.xpi
+          asset_name: thunderbird_rag_search-${{ github.event.release.tag_name || '1.0.0' }}.xpi
           asset_content_type: application/x-xpinstall
