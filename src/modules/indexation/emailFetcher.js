@@ -16,7 +16,7 @@ import { getConfig } from '../../config/storageManager.js';
  * @returns {Object} L'API messenger
  */
 function getMessengerAPI() {
-  // Essayer messenger (objet global dans les modules privilégiés)
+  // Essayer messenger (objet global dans les modules privilégié)
   if (typeof messenger !== 'undefined' && messenger) {
     return messenger;
   }
@@ -121,6 +121,22 @@ export async function getFullEmail(messageId) {
 }
 
 /**
+ * Récupère les parties de texte en ligne d'un email (corps du message)
+ * @param {string} messageId - L'ID du message
+ * @returns {Promise<Array>} Liste des parties de texte
+ */
+export async function getInlineTextParts(messageId) {
+  try {
+    const messengerAPI = getMessengerAPI();
+    const parts = await messengerAPI.messages.listInlineTextParts(messageId);
+    return parts;
+  } catch (error) {
+    await logError(error, `Récupération des parties de texte pour l'email ${messageId}`);
+    return [];
+  }
+}
+
+/**
  * Récupère les informations d'un dossier
  * @param {string} folderId - L'ID du dossier
  * @returns {Promise<Object|null>} Les informations du dossier ou null
@@ -166,6 +182,56 @@ export async function emailExists(messageId) {
     await logError(error, `Vérification de l'existence de l'email ${messageId}`);
     return false;
   }
+}
+
+/**
+ * Extrait le corps du message à partir des parties MIME
+ * @param {Object} fullMessage - Le message complet de getFull()
+ * @returns {string} Le corps du message en texte brut
+ */
+function extractBodyFromFullMessage(fullMessage) {
+  if (!fullMessage || !fullMessage.parts) {
+    return '';
+  }
+  
+  // Parcourir les parties pour trouver le corps du message
+  for (const part of fullMessage.parts) {
+    // Les parties de type text/plain ou text/html contiennent le corps
+    if (part.contentType && (part.contentType === 'text/plain' || part.contentType === 'text/html')) {
+      // Si c'est du HTML, on pourrait le convertir en texte brut, mais pour l'instant on retourne le contenu
+      return part.content || '';
+    }
+    
+    // Si la partie a des sous-parties, parcourir récursivement
+    if (part.parts) {
+      for (const subPart of part.parts) {
+        if (subPart.contentType && (subPart.contentType === 'text/plain' || subPart.contentType === 'text/html')) {
+          return subPart.content || '';
+        }
+      }
+    }
+  }
+  
+  return '';
+}
+
+/**
+ * Extrait les informations de l'expéditeur et des destinataires
+ * @param {Object} messageHeader - Le MessageHeader de l'email
+ * @returns {Object} Objet avec author et recipients
+ */
+function extractAddressInfo(messageHeader) {
+  // L'auteur est disponible directement dans MessageHeader
+  const author = messageHeader.author || '';
+  
+  // Les destinataires sont disponibles dans MessageHeader.recipients (array of MailboxHeaderString)
+  // Si ce n'est pas disponible, essayer de le récupérer depuis les headers
+  let recipients = [];
+  if (messageHeader.recipients && Array.isArray(messageHeader.recipients)) {
+    recipients = messageHeader.recipients;
+  }
+  
+  return { author, recipients };
 }
 
 /**
@@ -215,15 +281,33 @@ export async function fetchEmailsForIndexation(selectedFolderIds, config = null)
         // Récupérer le contenu complet de l'email
         const fullMessage = await getFullEmail(message.id);
         
+        // Extraire les informations d'adresse
+        const { author, recipients } = extractAddressInfo(message);
+        
+        // Extraire le corps du message
+        let body = '';
         if (fullMessage) {
+          // Essayer d'abord avec listInlineTextParts qui est plus fiable
+          const inlineParts = await getInlineTextParts(message.id);
+          if (inlineParts && inlineParts.length > 0) {
+            // Prendre la première partie de texte (généralement text/plain)
+            const textPart = inlineParts.find(p => p.contentType === 'text/plain') || inlineParts[0];
+            body = textPart.content || '';
+          } else {
+            // Sinon, extraire depuis les parties MIME
+            body = extractBodyFromFullMessage(fullMessage);
+          }
+        }
+        
+        if (message) {
           emails.push({
             id: message.id,
             folderId: folderId,
             folderName: folderInfo.name || folderInfo.path,
             subject: message.subject || '',
-            body: fullMessage.body || '',
-            author: message.author || message.from?.value || '',
-            recipients: message.recipients || message.to?.value ? [message.to.value] : [],
+            body: body,
+            author: author,
+            recipients: recipients,
             date: message.date ? new Date(message.date).getTime() : null,
             lastModified: message.lastModified ? new Date(message.lastModified).getTime() : null,
             size: message.size || 0,
@@ -232,7 +316,7 @@ export async function fetchEmailsForIndexation(selectedFolderIds, config = null)
             read: message.read || false,
             flagged: message.flagged || false,
             junk: message.junk || false,
-            attachments: indexAttachments ? fullMessage.attachments || [] : [],
+            attachments: indexAttachments && fullMessage ? fullMessage.attachments || [] : [],
           });
         }
       }
@@ -297,15 +381,30 @@ export async function fetchModifiedEmails(selectedFolderIds, lastIndexation, con
         // Récupérer le contenu complet de l'email
         const fullMessage = await getFullEmail(message.id);
         
+        // Extraire les informations d'adresse
+        const { author, recipients } = extractAddressInfo(message);
+        
+        // Extraire le corps du message
+        let body = '';
         if (fullMessage) {
+          const inlineParts = await getInlineTextParts(message.id);
+          if (inlineParts && inlineParts.length > 0) {
+            const textPart = inlineParts.find(p => p.contentType === 'text/plain') || inlineParts[0];
+            body = textPart.content || '';
+          } else {
+            body = extractBodyFromFullMessage(fullMessage);
+          }
+        }
+        
+        if (message) {
           emails.push({
             id: message.id,
             folderId: folderId,
             folderName: folderInfo.name || folderInfo.path,
             subject: message.subject || '',
-            body: fullMessage.body || '',
-            author: message.author || message.from?.value || '',
-            recipients: message.recipients || message.to?.value ? [message.to.value] : [],
+            body: body,
+            author: author,
+            recipients: recipients,
             date: message.date ? new Date(message.date).getTime() : null,
             lastModified: message.lastModified ? new Date(message.lastModified).getTime() : null,
             size: message.size || 0,
