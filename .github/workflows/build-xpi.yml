@@ -28,7 +28,7 @@ jobs:
 
       - name: Build de l'extension
         run: |
-          npx web-ext build
+          npm run build
 
       - name: Renommer le fichier en .xpi
         run: |
