@@ -5,12 +5,18 @@
  */
 
 import { logInfo, logError, logWarn } from './utils/logger.js';
-import { getConfig } from './config/storageManager.js';
+import { getConfig, saveConfig } from './config/storageManager.js';
 import {
   indexEmail,
   unindexEmail,
   getIndexStats,
   initIndexer,
+  indexAllEmails,
+  indexModifiedEmails,
+  clearIndex,
+  getIndexationState,
+  checkEmailIndexed,
+  checkEmbeddingConfig,
 } from './modules/indexation/indexer.js';
 
 /**
@@ -19,7 +25,7 @@ import {
  * @returns {Object|null} L'API messenger ou null si non disponible
  */
 function getMessengerAPI() {
-  // Essayer messenger (objet global dans les modules privilégiés)
+  // Essayer messenger (objet global dans les modules privilégés)
   if (typeof messenger !== 'undefined' && messenger) {
     return messenger;
   }
@@ -220,7 +226,49 @@ async function handleMessage(message, sender, sendResponse) {
         const accountsAndFolders = await getAccountsAndFolders();
         sendResponse({ success: true, ...accountsAndFolders });
         break;
+
+      // Nouveaux types de messages pour l'indexation
+      case 'INDEX_ALL_EMAILS':
+        const allResult = await indexAllEmails(message.selectedFolderIds, message.config);
+        sendResponse({ success: allResult.success, ...allResult });
+        break;
         
+      case 'INDEX_MODIFIED_EMAILS':
+        const modifiedResult = await indexModifiedEmails(message.selectedFolderIds, message.config);
+        sendResponse({ success: modifiedResult.success, ...modifiedResult });
+        break;
+        
+      case 'CLEAR_INDEX':
+        const clearResult = await clearIndex();
+        sendResponse({ success: clearResult.success, ...clearResult });
+        break;
+        
+      case 'GET_INDEXATION_STATE':
+        const state = getIndexationState();
+        sendResponse({ success: true, state });
+        break;
+        
+      case 'CHECK_EMAIL_INDEXED':
+        const isIndexed = await checkEmailIndexed(message.emailId, message.lastModified);
+        sendResponse({ success: true, isIndexed });
+        break;
+        
+      case 'CHECK_EMBEDDING_CONFIG':
+        const embeddingConfig = await checkEmbeddingConfig();
+        sendResponse({ success: true, ...embeddingConfig });
+        break;
+
+      // Messages depuis content.js
+      case 'EMAIL_CLICKED':
+        await logInfo(`Email cliqué : ${message.messageId}`);
+        sendResponse({ success: true });
+        break;
+        
+      case 'FOCUS_SEARCH':
+        await logInfo('Focus sur la recherche demandé');
+        sendResponse({ success: true });
+        break;
+
       default:
         await logWarn(`Type de message inconnu : ${message.type}`);
         sendResponse({ success: false, error: 'Type de message inconnu' });
@@ -485,8 +533,7 @@ function startPeriodicChecks() {
       const selectedFolders = config.selectedFolders || [];
       
       if (selectedFolders.length > 0) {
-        // Importer dynamiquement pour éviter les dépendances circulaires
-        const { indexModifiedEmails } = await import('./modules/indexation/indexer.js');
+        // Indexer les emails modifiés via le background
         await indexModifiedEmails(selectedFolders);
       }
     } catch (error) {

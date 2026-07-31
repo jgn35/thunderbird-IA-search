@@ -2,9 +2,8 @@
  * Module pour la récupération des emails depuis Thunderbird
  * @module modules/indexation/emailFetcher
  * 
- * NOTE: Ce module peut être appelé depuis différents contextes (sidebar, background, options).
- * Il doit donc utiliser browser.runtime.sendMessage() pour accéder à l'API messenger,
- * car browser.messenger n'est disponible que dans le background script.
+ * NOTE: Ce module est maintenant appelé UNIQUEMENT depuis background.js.
+ * Il peut donc utiliser directement l'API messenger sans passer par des messages.
  */
 
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
@@ -12,78 +11,22 @@ import { isFolderExcluded, isEmailTooLarge } from '../../utils/helpers.js';
 import { getConfig } from '../../config/storageManager.js';
 
 /**
- * Envoie un message au background script pour exécuter une opération messenger
- * @param {string} type - Type de l'opération
- * @param {Object} data - Données à transmettre
- * @returns {Promise<any>} Résultat de l'opération
+ * Obtient l'API messenger disponible
+ * Dans Thunderbird, on peut utiliser soit browser.messenger soit messenger (objet global)
+ * @returns {Object} L'API messenger
  */
-async function sendMessengerRequest(type, data = {}) {
-  try {
-    // Dans le background script, browser.messenger est disponible directement
-    if (typeof browser !== 'undefined' && browser.messenger) {
-      // On est dans le background script, on peut utiliser messenger directement
-      return await handleMessengerRequest(type, data);
-    }
-    
-    // Dans d'autres contextes (sidebar, options), on passe par le background
-    if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
-      const response = await browser.runtime.sendMessage({ type, ...data });
-      if (response && response.success) {
-        return response.data;
-      }
-      throw new Error(response?.error || 'Erreur inconnue');
-    }
-    
-    throw new Error('API browser.runtime.sendMessage non disponible');
-  } catch (error) {
-    await logError(error, `Requête messenger: ${type}`);
-    throw error;
+function getMessengerAPI() {
+  // Essayer messenger (objet global dans les modules privilégiés)
+  if (typeof messenger !== 'undefined' && messenger) {
+    return messenger;
   }
-}
-
-/**
- * Gère une requête messenger directement (pour le background script)
- * @param {string} type - Type de l'opération
- * @param {Object} data - Données à transmettre
- * @returns {Promise<any>} Résultat de l'opération
- */
-async function handleMessengerRequest(type, data = {}) {
-  const messengerAPI = typeof messenger !== 'undefined' ? messenger : browser.messenger;
   
-  switch (type) {
-    case 'MESSENGER_GET_ACCOUNTS':
-      return await messengerAPI.accounts.list();
-    
-    case 'MESSENGER_GET_FOLDERS':
-      return await messengerAPI.folders.query({ accountId: data.accountId });
-    
-    case 'MESSENGER_GET_EMAILS':
-      // messages.list() prend UN objet avec les propriétés, pas deux arguments
-      return await messengerAPI.messages.list({
-        folderId: data.folderId,
-        ...(data.options || {})
-      });
-    
-    case 'MESSENGER_GET_FULL_EMAIL':
-      return await messengerAPI.messages.getFull(data.messageId);
-    
-    case 'MESSENGER_GET_FOLDER':
-      return await messengerAPI.folders.get(data.folderId);
-    
-    case 'MESSENGER_GET_MESSAGE':
-      return await messengerAPI.messages.get(data.messageId);
-    
-    case 'MESSENGER_EMAIL_EXISTS':
-      try {
-        const message = await messengerAPI.messages.get(data.messageId);
-        return !!message;
-      } catch (error) {
-        return false;
-      }
-    
-    default:
-      throw new Error(`Type de requête messenger inconnu: ${type}`);
+  // Essayer browser.messenger (API standard WebExtension)
+  if (typeof browser !== 'undefined' && browser && browser.messenger) {
+    return browser.messenger;
   }
+  
+  throw new Error('Aucune API messenger disponible');
 }
 
 /**
@@ -92,7 +35,8 @@ async function handleMessengerRequest(type, data = {}) {
  */
 export async function getAccounts() {
   try {
-    const accounts = await sendMessengerRequest('MESSENGER_GET_ACCOUNTS');
+    const messengerAPI = getMessengerAPI();
+    const accounts = await messengerAPI.accounts.list();
     await logInfo(`Récupération de ${accounts.length} comptes email`);
     return accounts;
   } catch (error) {
@@ -108,7 +52,8 @@ export async function getAccounts() {
  */
 export async function getFolders(accountId) {
   try {
-    const folders = await sendMessengerRequest('MESSENGER_GET_FOLDERS', { accountId });
+    const messengerAPI = getMessengerAPI();
+    const folders = await messengerAPI.folders.query({ accountId });
     await logInfo(`Récupération de ${folders.length} dossiers pour le compte ${accountId}`);
     return folders;
   } catch (error) {
@@ -118,27 +63,40 @@ export async function getFolders(accountId) {
 }
 
 /**
- * Récupère la liste des emails dans un dossier
+ * Récupère tous les messages d'un dossier en utilisant la pagination
  * @param {string} folderId - L'ID du dossier
  * @param {Object} [options] - Options de filtrage
- * @param {number} [options.limit] - Limite de résultats
- * @param {number} [options.offset] - Décalage
+ * @param {number} [options.limit] - Limite de résultats (non utilisé avec la pagination)
+ * @param {number} [options.offset] - Décalage (non utilisé avec la pagination)
  * @returns {Promise<Object>} Objet contenant la liste des emails et le total
  */
 export async function getEmails(folderId, options = {}) {
-  const { limit = 50, offset = 0 } = options;
-  
   try {
-    const result = await sendMessengerRequest('MESSENGER_GET_EMAILS', {
-      folderId,
-      options: { limit, offset }
-    });
+    const messengerAPI = getMessengerAPI();
     
-    await logInfo(`Récupération de ${result.messages.length} emails dans le dossier ${folderId}`);
+    // Utiliser la pagination selon la documentation Thunderbird
+    // messages.list() retourne des pages de messages
+    let page = await messengerAPI.messages.list(folderId);
+    const allMessages = [];
+    
+    // Traiter la première page
+    if (page.messages) {
+      allMessages.push(...page.messages);
+    }
+    
+    // Continuer avec les pages suivantes tant qu'il y a un id
+    while (page.id) {
+      page = await messengerAPI.messages.continueList(page.id);
+      if (page.messages) {
+        allMessages.push(...page.messages);
+      }
+    }
+    
+    await logInfo(`Récupération de ${allMessages.length} emails dans le dossier ${folderId}`);
     
     return {
-      messages: result.messages,
-      total: result.total,
+      messages: allMessages,
+      total: allMessages.length,
     };
   } catch (error) {
     await logError(error, `Récupération des emails dans le dossier ${folderId}`);
@@ -153,7 +111,8 @@ export async function getEmails(folderId, options = {}) {
  */
 export async function getFullEmail(messageId) {
   try {
-    const message = await sendMessengerRequest('MESSENGER_GET_FULL_EMAIL', { messageId });
+    const messengerAPI = getMessengerAPI();
+    const message = await messengerAPI.messages.getFull(messageId);
     return message;
   } catch (error) {
     await logError(error, `Récupération de l'email ${messageId}`);
@@ -168,7 +127,8 @@ export async function getFullEmail(messageId) {
  */
 export async function getFolder(folderId) {
   try {
-    const folder = await sendMessengerRequest('MESSENGER_GET_FOLDER', { folderId });
+    const messengerAPI = getMessengerAPI();
+    const folder = await messengerAPI.folders.get(folderId);
     return folder;
   } catch (error) {
     await logError(error, `Récupération du dossier ${folderId}`);
@@ -183,7 +143,8 @@ export async function getFolder(folderId) {
  */
 export async function getMessage(messageId) {
   try {
-    const message = await sendMessengerRequest('MESSENGER_GET_MESSAGE', { messageId });
+    const messengerAPI = getMessengerAPI();
+    const message = await messengerAPI.messages.get(messageId);
     return message;
   } catch (error) {
     await logError(error, `Récupération du message ${messageId}`);
@@ -198,8 +159,9 @@ export async function getMessage(messageId) {
  */
 export async function emailExists(messageId) {
   try {
-    const exists = await sendMessengerRequest('MESSENGER_EMAIL_EXISTS', { messageId });
-    return exists;
+    const messengerAPI = getMessengerAPI();
+    const message = await messengerAPI.messages.get(messageId);
+    return !!message;
   } catch (error) {
     await logError(error, `Vérification de l'existence de l'email ${messageId}`);
     return false;
@@ -238,49 +200,41 @@ export async function fetchEmailsForIndexation(selectedFolderIds, config = null)
         continue;
       }
 
-      // Récupérer tous les emails du dossier
-      let offset = 0;
-      const limit = 50;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { messages, total } = await getEmails(folderId, { limit, offset });
+      // Récupérer tous les emails du dossier (avec pagination automatique)
+      const { messages } = await getEmails(folderId);
+      
+      for (const message of messages) {
+        processedCount++;
         
-        for (const message of messages) {
-          processedCount++;
-          
-          // Vérifier la taille de l'email
-          if (isEmailTooLarge(message, maxEmailSize)) {
-            skippedCount++;
-            continue;
-          }
-
-          // Récupérer le contenu complet de l'email
-          const fullMessage = await getFullEmail(message.id);
-          
-          if (fullMessage) {
-            emails.push({
-              id: fullMessage.id,
-              folderId: folderId,
-              folderName: folderInfo.name || folderInfo.path,
-              subject: fullMessage.subject || '',
-              body: fullMessage.body || '',
-              from: fullMessage.from?.value || '',
-              to: fullMessage.to?.value || '',
-              cc: fullMessage.cc?.value || '',
-              bcc: fullMessage.bcc?.value || '',
-              date: fullMessage.date ? new Date(fullMessage.date).getTime() : null,
-              lastModified: fullMessage.lastModified ? new Date(fullMessage.lastModified).getTime() : null,
-              size: fullMessage.size || 0,
-              flags: fullMessage.flags || [],
-              tags: fullMessage.tags || [],
-              attachments: indexAttachments ? fullMessage.attachments || [] : [],
-            });
-          }
+        // Vérifier la taille de l'email
+        if (isEmailTooLarge(message, maxEmailSize)) {
+          skippedCount++;
+          continue;
         }
 
-        offset += limit;
-        hasMore = offset < total;
+        // Récupérer le contenu complet de l'email
+        const fullMessage = await getFullEmail(message.id);
+        
+        if (fullMessage) {
+          emails.push({
+            id: message.id,
+            folderId: folderId,
+            folderName: folderInfo.name || folderInfo.path,
+            subject: message.subject || '',
+            body: fullMessage.body || '',
+            author: message.author || message.from?.value || '',
+            recipients: message.recipients || message.to?.value ? [message.to.value] : [],
+            date: message.date ? new Date(message.date).getTime() : null,
+            lastModified: message.lastModified ? new Date(message.lastModified).getTime() : null,
+            size: message.size || 0,
+            flags: message.flags || [],
+            tags: message.tags || [],
+            read: message.read || false,
+            flagged: message.flagged || false,
+            junk: message.junk || false,
+            attachments: indexAttachments ? fullMessage.attachments || [] : [],
+          });
+        }
       }
 
       await logInfo(`Dossier ${folderInfo.name} : ${processedCount} emails traités, ${skippedCount} ignorés`);
@@ -324,48 +278,42 @@ export async function fetchModifiedEmails(selectedFolderIds, lastIndexation, con
       }
 
       // Récupérer les emails modifiés depuis la dernière indexation
-      let offset = 0;
-      const limit = 50;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { messages, total } = await getEmails(folderId, { limit, offset });
+      const { messages } = await getEmails(folderId);
+      
+      for (const message of messages) {
+        // Vérifier si l'email a été modifié depuis la dernière indexation
+        const messageDate = message.date ? new Date(message.date).getTime() : 0;
+        const lastModified = message.lastModified ? new Date(message.lastModified).getTime() : messageDate;
         
-        for (const message of messages) {
-          // Vérifier si l'email a été modifié depuis la dernière indexation
-          const messageDate = message.date ? new Date(message.date).getTime() : 0;
-          const lastModified = message.lastModified ? new Date(message.lastModified).getTime() : messageDate;
-          
-          if (lastModified <= lastIndexationDate) {
-            continue; // Email non modifié depuis la dernière indexation
-          }
-
-          // Vérifier la taille de l'email
-          if (isEmailTooLarge(message, maxEmailSize)) {
-            continue;
-          }
-
-          // Récupérer le contenu complet de l'email
-          const fullMessage = await getFullEmail(message.id);
-          
-          if (fullMessage) {
-            emails.push({
-              id: fullMessage.id,
-              folderId: folderId,
-              folderName: folderInfo.name || folderInfo.path,
-              subject: fullMessage.subject || '',
-              body: fullMessage.body || '',
-              from: fullMessage.from?.value || '',
-              to: fullMessage.to?.value || '',
-              date: fullMessage.date ? new Date(fullMessage.date).getTime() : null,
-              lastModified: fullMessage.lastModified ? new Date(fullMessage.lastModified).getTime() : null,
-              size: fullMessage.size || 0,
-            });
-          }
+        if (lastModified <= lastIndexationDate) {
+          continue; // Email non modifié depuis la dernière indexation
         }
 
-        offset += limit;
-        hasMore = offset < total;
+        // Vérifier la taille de l'email
+        if (isEmailTooLarge(message, maxEmailSize)) {
+          continue;
+        }
+
+        // Récupérer le contenu complet de l'email
+        const fullMessage = await getFullEmail(message.id);
+        
+        if (fullMessage) {
+          emails.push({
+            id: message.id,
+            folderId: folderId,
+            folderName: folderInfo.name || folderInfo.path,
+            subject: message.subject || '',
+            body: fullMessage.body || '',
+            author: message.author || message.from?.value || '',
+            recipients: message.recipients || message.to?.value ? [message.to.value] : [],
+            date: message.date ? new Date(message.date).getTime() : null,
+            lastModified: message.lastModified ? new Date(message.lastModified).getTime() : null,
+            size: message.size || 0,
+            read: message.read || false,
+            flagged: message.flagged || false,
+            junk: message.junk || false,
+          });
+        }
       }
     } catch (error) {
       await logError(error, `Erreur lors de la récupération des emails modifiés pour le dossier ${folderId}`);

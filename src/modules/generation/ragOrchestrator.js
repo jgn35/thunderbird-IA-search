@@ -219,9 +219,17 @@ export async function summarizeConversation(emailIds, options = {}) {
     const emails = [];
     for (const emailId of emailIds) {
       try {
-        const email = await browser.messenger.messages.getFull(emailId);
-        if (email) {
-          emails.push(email);
+        // Utiliser l'API messenger directement (disponible dans background)
+        // Si appelé depuis UI, cela nécessiterait browser.runtime.sendMessage
+        // Pour l'instant, on utilise directement l'API
+        const messengerAPI = typeof messenger !== 'undefined' ? messenger : (typeof browser !== 'undefined' ? browser.messenger : null);
+        if (messengerAPI) {
+          const email = await messengerAPI.messages.getFull(emailId);
+          if (email) {
+            emails.push(email);
+          }
+        } else {
+          await logWarn(`API messenger non disponible pour récupérer l'email ${emailId}`);
         }
       } catch (error) {
         await logError(error, `Récupération de l'email ${emailId}`);

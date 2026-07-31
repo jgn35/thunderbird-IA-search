@@ -4,14 +4,6 @@
  */
 
 import {
-  indexAllEmails,
-  indexModifiedEmails,
-  clearIndex,
-  getIndexStats,
-  getIndexationState,
-} from '../indexation/indexer.js';
-
-import {
   getConfig,
   saveConfig,
   resetConfig,
@@ -69,9 +61,16 @@ async function init() {
  */
 async function loadConfig() {
   try {
-    const config = await getConfig();
-    appState.config = config;
-    appState.originalConfig = JSON.parse(JSON.stringify(config));
+    const response = await browser.runtime.sendMessage({ type: 'GET_CONFIG' });
+    if (response && response.success) {
+      appState.config = response.config;
+      appState.originalConfig = JSON.parse(JSON.stringify(response.config));
+    } else {
+      console.error('Erreur lors du chargement de la configuration:', response?.error);
+      const defaultConfig = getDefaultConfig();
+      appState.config = defaultConfig;
+      appState.originalConfig = JSON.parse(JSON.stringify(defaultConfig));
+    }
   } catch (error) {
     console.error('Erreur lors du chargement de la configuration:', error);
     const defaultConfig = getDefaultConfig();
@@ -172,22 +171,25 @@ function updateSelectedFoldersInUI() {
  */
 async function updateIndexStats() {
   try {
-    const stats = await getIndexStats();
-    const state = getIndexationState();
+    const response = await browser.runtime.sendMessage({ type: 'GET_INDEX_STATS' });
     
-    // Mettre à jour l'interface
-    const indexedCountElement = document.getElementById('indexedCount');
-    const lastIndexationElement = document.getElementById('lastIndexation');
-    
-    if (indexedCountElement) {
-      indexedCountElement.textContent = stats.totalIndexed || 0;
-    }
-    
-    if (lastIndexationElement) {
-      if (stats.lastIndexation) {
-        lastIndexationElement.textContent = new Date(stats.lastIndexation).toLocaleString('fr-FR');
-      } else {
-        lastIndexationElement.textContent = 'Jamais';
+    if (response && response.success) {
+      const stats = response.stats;
+      
+      // Mettre à jour l'interface
+      const indexedCountElement = document.getElementById('indexedCount');
+      const lastIndexationElement = document.getElementById('lastIndexation');
+      
+      if (indexedCountElement) {
+        indexedCountElement.textContent = stats.totalIndexed || 0;
+      }
+      
+      if (lastIndexationElement) {
+        if (stats.lastIndexation) {
+          lastIndexationElement.textContent = new Date(stats.lastIndexation).toLocaleString('fr-FR');
+        } else {
+          lastIndexationElement.textContent = 'Jamais';
+        }
       }
     }
     
@@ -323,12 +325,22 @@ async function startIndexation(type) {
     let result;
     
     if (type === 'all') {
-      result = await indexAllEmails(selectedFolders);
+      // Envoyer un message au background script pour l'indexation complète
+      result = await browser.runtime.sendMessage({
+        type: 'INDEX_ALL_EMAILS',
+        selectedFolderIds: selectedFolders,
+        config: appState.config
+      });
     } else {
-      result = await indexModifiedEmails(selectedFolders);
+      // Envoyer un message au background script pour l'indexation des emails modifiés
+      result = await browser.runtime.sendMessage({
+        type: 'INDEX_MODIFIED_EMAILS',
+        selectedFolderIds: selectedFolders,
+        config: appState.config
+      });
     }
     
-    if (result.success) {
+    if (result && result.success) {
       showNotification(
         `Indexation terminée: ${result.indexed} emails indexés, ${result.skipped} ignorés`,
         'success'
@@ -338,7 +350,7 @@ async function startIndexation(type) {
       await updateIndexStats();
     } else {
       showNotification(
-        result.error || 'Erreur lors de l\'indexation',
+        result?.error || 'Erreur lors de l\'indexation',
         'error'
       );
     }
@@ -367,13 +379,13 @@ async function clearIndexAction() {
   showLoading('Vidage de l\'index...');
   
   try {
-    const result = await clearIndex();
+    const result = await browser.runtime.sendMessage({ type: 'CLEAR_INDEX' });
     
-    if (result.success) {
+    if (result && result.success) {
       showNotification('Index vidé avec succès', 'success');
       await updateIndexStats();
     } else {
-      showNotification(result.error || 'Erreur lors du vidage de l\'index', 'error');
+      showNotification(result?.error || 'Erreur lors du vidage de l\'index', 'error');
     }
     
   } catch (error) {
@@ -700,18 +712,18 @@ async function checkOllamaStatus() {
     const result = await checkStatus();
     
     if (result.isRunning) {
-      statusElement.textContent = '✓ Ollama est en cours d\'exécution';
+      statusElement.textContent = '\u2713 Ollama est en cours d\'exécution';
       statusElement.style.color = 'var(--success-color)';
       showNotification('Ollama est en cours d\'exécution', 'success');
     } else {
-      statusElement.textContent = '✗ Ollama n\'est pas accessible';
+      statusElement.textContent = '\u2717 Ollama n\'est pas accessible';
       statusElement.style.color = 'var(--danger-color)';
       showNotification(result.error || 'Ollama n\'est pas accessible', 'error');
     }
     
   } catch (error) {
     console.error('Erreur lors de la vérification du statut Ollama:', error);
-    statusElement.textContent = '✗ Erreur de vérification';
+    statusElement.textContent = '\u2717 Erreur de vérification';
     statusElement.style.color = 'var(--danger-color)';
     showNotification('Erreur lors de la vérification du statut Ollama', 'error');
   }
