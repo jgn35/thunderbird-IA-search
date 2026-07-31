@@ -18,14 +18,14 @@ describe('Vector Store - Utilities', () => {
   describe('getEmbeddingDimension', () => {
     test('should return the correct dimension', () => {
       const dimension = getEmbeddingDimension();
-      expect(dimension).toBe(384);
+      expect(dimension).toBe(1024);
     });
   });
 
   describe('createZeroVector', () => {
     test('should create a vector of correct dimension filled with zeros', () => {
       const zeroVector = createZeroVector();
-      expect(zeroVector.length).toBe(384);
+      expect(zeroVector.length).toBe(1024);
       expect(zeroVector.every(val => val === 0)).toBe(true);
     });
   });

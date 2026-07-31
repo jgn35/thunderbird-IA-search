@@ -22,8 +22,8 @@ describe('Performance - Embedding Service', () => {
 
   describe('cosineSimilarity', () => {
     test('should calculate similarity quickly for small vectors', () => {
-      const vectorA = new Array(384).fill(0.5);
-      const vectorB = new Array(384).fill(0.3);
+      const vectorA = new Array(1024).fill(0.5);
+      const vectorB = new Array(1024).fill(0.3);
 
       const startTime = performance.now();
       const similarity = cosineSimilarity(vectorA, vectorB);
@@ -36,8 +36,8 @@ describe('Performance - Embedding Service', () => {
     });
 
     test('should calculate similarity quickly for many vectors', () => {
-      const vectorsA = Array(100).fill(null).map(() => new Array(384).fill(Math.random()));
-      const vectorsB = Array(100).fill(null).map(() => new Array(384).fill(Math.random()));
+      const vectorsA = Array(100).fill(null).map(() => new Array(1024).fill(Math.random()));
+      const vectorsB = Array(100).fill(null).map(() => new Array(1024).fill(Math.random()));
 
       const startTime = performance.now();
       for (let i = 0; i < 100; i++) {
@@ -53,14 +53,14 @@ describe('Performance - Embedding Service', () => {
       const startTime = performance.now();
       
       // Vecteurs nuls
-      cosineSimilarity(new Array(384).fill(0), new Array(384).fill(0));
+      cosineSimilarity(new Array(1024).fill(0), new Array(1024).fill(0));
       
       // Vecteurs de tailles différentes
-      cosineSimilarity(new Array(384).fill(0), new Array(100).fill(0));
+      cosineSimilarity(new Array(1024).fill(0), new Array(100).fill(0));
       
       // Vecteurs null
-      cosineSimilarity(null, new Array(384).fill(0));
-      cosineSimilarity(new Array(384).fill(0), null);
+      cosineSimilarity(null, new Array(1024).fill(0));
+      cosineSimilarity(new Array(1024).fill(0), null);
       
       const endTime = performance.now();
       const duration = endTime - startTime;
@@ -71,8 +71,8 @@ describe('Performance - Embedding Service', () => {
 
   describe('euclideanDistance', () => {
     test('should calculate distance quickly for small vectors', () => {
-      const vectorA = new Array(384).fill(0.5);
-      const vectorB = new Array(384).fill(0.3);
+      const vectorA = new Array(1024).fill(0.5);
+      const vectorB = new Array(1024).fill(0.3);
 
       const startTime = performance.now();
       const distance = euclideanDistance(vectorA, vectorB);
@@ -85,8 +85,8 @@ describe('Performance - Embedding Service', () => {
     });
 
     test('should calculate distance quickly for many vectors', () => {
-      const vectorsA = Array(100).fill(null).map(() => new Array(384).fill(Math.random()));
-      const vectorsB = Array(100).fill(null).map(() => new Array(384).fill(Math.random()));
+      const vectorsA = Array(100).fill(null).map(() => new Array(1024).fill(Math.random()));
+      const vectorsB = Array(100).fill(null).map(() => new Array(1024).fill(Math.random()));
 
       const startTime = performance.now();
       for (let i = 0; i < 100; i++) {
@@ -106,7 +106,7 @@ describe('Performance - Embedding Service', () => {
       const endTime = performance.now();
       const duration = endTime - startTime;
 
-      expect(vector.length).toBe(384);
+      expect(vector.length).toBe(1024);
       expect(duration).toBeLessThan(1); // Moins de 1ms
     });
 
@@ -117,7 +117,7 @@ describe('Performance - Embedding Service', () => {
       const duration = endTime - startTime;
 
       expect(vectors.length).toBe(1000);
-      expect(vectors.every(v => v.length === 384)).toBe(true);
+      expect(vectors.every(v => v.length === 1024)).toBe(true);
       expect(duration).toBeLessThan(10); // Moins de 10ms pour 1000 vecteurs
     });
   });
@@ -129,7 +129,7 @@ describe('Performance - Embedding Service', () => {
       const endTime = performance.now();
       const duration = endTime - startTime;
 
-      expect(dimension).toBe(384);
+      expect(dimension).toBe(1024);
       expect(duration).toBeLessThan(0.1); // Moins de 0.1ms
     });
   });
@@ -138,7 +138,7 @@ describe('Performance - Embedding Service', () => {
     test('should calculate batch similarities quickly', () => {
       // Créer 1000 vecteurs
       const vectors = Array(1000).fill(null).map(() => {
-        return new Array(384).fill(null).map(() => Math.random());
+        return new Array(1024).fill(null).map(() => Math.random());
       });
 
       // Calculer la similarité entre chaque paire
@@ -164,12 +164,12 @@ describe('Performance - Embedding Service', () => {
     test('should find most similar vectors quickly', () => {
       // Créer 100 vecteurs
       const vectors = Array(100).fill(null).map((_, i) => {
-        const vec = new Array(384).fill(0);
-        vec[i % 384] = 1; // Chaque vecteur a une valeur différente
+        const vec = new Array(1024).fill(0);
+        vec[i % 1024] = 1; // Chaque vecteur a une valeur différente
         return vec;
       });
 
-      const queryVector = new Array(384).fill(0);
+      const queryVector = new Array(1024).fill(0);
       queryVector[0] = 1; // Similaire au premier vecteur
 
       const startTime = performance.now();
