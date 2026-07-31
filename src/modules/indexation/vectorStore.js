@@ -196,42 +196,62 @@ export async function getEmailCollection() {
             
             const results = [];
             const idsToGet = ids || [];
+            let pendingRequests = 0;
             
             if (idsToGet.length > 0) {
+              pendingRequests = idsToGet.length;
               for (const id of idsToGet) {
                 const request = store.get(id);
                 request.onsuccess = () => {
                   if (request.result) {
                     results.push(request.result);
                   }
+                  pendingRequests--;
+                };
+                request.onerror = () => {
+                  pendingRequests--;
                 };
               }
             } else {
+              pendingRequests = 1;
               const request = store.getAll();
               request.onsuccess = () => {
                 results.push(...request.result);
+                pendingRequests--;
+              };
+              request.onerror = () => {
+                pendingRequests--;
               };
             }
             
             tx.oncomplete = () => {
-              // Formater les résultats comme ChromaDB
-              const formattedResults = {
-                ids: results.map(r => r.id),
-                documents: results.map(r => r.document),
-                metadatas: results.map(r => ({
-                  emailId: r.emailId,
-                  subject: r.subject,
-                  body: r.body,
-                  from: r.from,
-                  to: r.to,
-                  date: r.date,
-                  folderName: r.folderName,
-                  lastModified: r.lastModified,
-                  embeddingHash: r.embeddingHash,
-                })),
-                embeddings: results.map(r => r.embedding),
+              // Attendre que toutes les requêtes soient terminées
+              const checkComplete = () => {
+                if (pendingRequests === 0) {
+                  // Formater les résultats comme ChromaDB
+                  const formattedResults = {
+                    ids: results.map(r => r.id),
+                    documents: results.map(r => r.document),
+                    metadatas: results.map(r => ({
+                      emailId: r.emailId,
+                      subject: r.subject,
+                      body: r.body,
+                      from: r.from,
+                      to: r.to,
+                      date: r.date,
+                      folderName: r.folderName,
+                      lastModified: r.lastModified,
+                      embeddingHash: r.embeddingHash,
+                    })),
+                    embeddings: results.map(r => r.embedding),
+                  };
+                  resolve(formattedResults);
+                } else {
+                  // Vérifier à nouveau après un court délai
+                  setTimeout(checkComplete, 10);
+                }
               };
-              resolve(formattedResults);
+              checkComplete();
             };
           });
         });
@@ -284,11 +304,9 @@ export async function getEmailCollection() {
         return new Promise(async (resolve, reject) => {
           queueOperation(async () => {
             try {
-              const tx = db.transaction(EMAIL_STORE, 'readonly');
-              const store = tx.objectStore(EMAIL_STORE);
-              
-              // Générer l'embedding pour la requête
               const queryText = queryTexts[0];
+              
+              // Générer l'embedding pour la requête AVANT de créer la transaction
               const embeddingResult = await generateSingleEmbedding(queryText);
               
               if (!embeddingResult.success) {
@@ -301,13 +319,17 @@ export async function getEmailCollection() {
               
               const queryEmbedding = embeddingResult.embedding;
               
+              // Créer la transaction APRÈS avoir l'embedding
+              const tx = db.transaction(EMAIL_STORE, 'readonly');
+              const store = tx.objectStore(EMAIL_STORE);
+              
               // Récupérer tous les emails
               const allRequest = store.getAll();
               
-              allRequest.onsuccess = async () => {
+              allRequest.onsuccess = () => {
                 const allRecords = allRequest.result;
                 
-                // Calculer les similarités
+                // Calculer les similarités (synchronement, pas de await ici)
                 const results = [];
                 
                 for (const record of allRecords) {
@@ -432,7 +454,24 @@ async function performKeywordSearch(query, limit) {
         resolve(formattedResults);
       };
       
-      tx.oncomplete = () => {};
+      allRequest.onerror = (event) => {
+        // En cas d'erreur, résoudre avec un tableau vide
+        resolve({
+          ids: [[]],
+          documents: [[]],
+          metadatas: [[]],
+          distances: [[]],
+        });
+      };
+      
+      tx.onerror = (event) => {
+        resolve({
+          ids: [[]],
+          documents: [[]],
+          metadatas: [[]],
+          distances: [[]],
+        });
+      };
     });
   });
 }
