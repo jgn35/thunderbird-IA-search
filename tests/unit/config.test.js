@@ -51,7 +51,7 @@ describe('Configuration par défaut', () => {
       expect(DEFAULT_CONFIG.rag.api.endpoint).toBe('https://api.mistral.ai/v1');
       expect(DEFAULT_CONFIG.rag.api.apiKey).toBe('');
       expect(DEFAULT_CONFIG.rag.api.embeddingEndpoint).toBe('https://api.mistral.ai/v1/embeddings');
-      expect(DEFAULT_CONFIG.rag.api.model).toBe('mistral-tiny');
+      expect(DEFAULT_CONFIG.rag.api.model).toBe('mistral-embed');
       
       // Configuration locale (Ollama)
       expect(DEFAULT_CONFIG.rag.local).toBeDefined();

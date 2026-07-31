@@ -94,14 +94,14 @@ describe('Embedding Service', () => {
   describe('getEmbeddingDimension', () => {
     test('should return the correct dimension', () => {
       const dimension = getEmbeddingDimension();
-      expect(dimension).toBe(384); // Dimension pour mistral-embed-text
+      expect(dimension).toBe(1024); // Dimension pour mistral-embed
     });
   });
 
   describe('createZeroVector', () => {
     test('should create a vector of correct dimension filled with zeros', () => {
       const zeroVector = createZeroVector();
-      expect(zeroVector.length).toBe(384);
+      expect(zeroVector.length).toBe(1024);
       expect(zeroVector.every(val => val === 0)).toBe(true);
     });
   });

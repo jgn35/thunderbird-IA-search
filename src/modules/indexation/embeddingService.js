@@ -19,7 +19,7 @@ import {
  * Dimension des embeddings Mistral (à vérifier selon le modèle utilisé)
  * @type {number}
  */
-const EMBEDDING_DIMENSION = 384; // Dimension pour mistral-embed-text
+const EMBEDDING_DIMENSION = 1024; // Dimension pour mistral-embed
 
 /**
  * Timeout par défaut pour les requêtes API (en ms)
@@ -37,7 +37,7 @@ const DEFAULT_EMBEDDING_ENDPOINT = 'https://api.mistral.ai/v1/embeddings';
  * Modèle par défaut pour les embeddings
  * @type {string}
  */
-const DEFAULT_EMBEDDING_MODEL = 'mistral-embed-text';
+const DEFAULT_EMBEDDING_MODEL = 'mistral-embed';
 
 /**
  * En-têtes par défaut pour les requêtes API

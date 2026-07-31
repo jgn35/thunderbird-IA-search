@@ -65,7 +65,7 @@ export const DEFAULT_CONFIG = {
       endpoint: "https://api.mistral.ai/v1",
       apiKey: "",
       embeddingEndpoint: "https://api.mistral.ai/v1/embeddings",
-      model: "mistral-tiny",
+      model: "mistral-embed",
     },
     local: {
       url: "http://localhost:11434",

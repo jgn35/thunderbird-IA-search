@@ -207,6 +207,7 @@ describe('Config - Default Config', () => {
       expect(DEFAULT_CONFIG.rag.type).toBe('api_externe');
       expect(DEFAULT_CONFIG.rag.api.endpoint).toBe('https://api.mistral.ai/v1');
       expect(DEFAULT_CONFIG.rag.api.apiKey).toBe('');
+      expect(DEFAULT_CONFIG.rag.api.model).toBe('mistral-embed');
       expect(DEFAULT_CONFIG.rag.local.url).toBe('http://localhost:11434');
       expect(DEFAULT_CONFIG.rag.local.model).toBe('mistral-7b');
     });
