@@ -9,6 +9,11 @@ import { callOllamaAPI, generateResponseWithContext as generateWithOllama } from
 import { logInfo, logError, logWarn } from '../../utils/logger.js';
 import { getConfig } from '../../config/storageManager.js';
 import { checkEmbeddingConfig } from '../indexation/indexer.js';
+import {
+  getInlineTextParts,
+  extractBodyFromFullMessage,
+  extractAddressInfo,
+} from '../indexation/emailFetcher.js';
 
 /**
  * Type de LLM
@@ -226,7 +231,26 @@ export async function summarizeConversation(emailIds, options = {}) {
         if (messengerAPI) {
           const email = await messengerAPI.messages.getFull(emailId);
           if (email) {
-            emails.push(email);
+            // Extraire les informations d'adresse
+            const { author, recipients } = extractAddressInfo(email);
+            
+            // Extraire le corps du message
+            let body = '';
+            const inlineParts = await getInlineTextParts(emailId);
+            if (inlineParts && inlineParts.length > 0) {
+              const textPart = inlineParts.find(p => p.contentType === 'text/plain') || inlineParts[0];
+              body = textPart.content || '';
+            } else {
+              body = extractBodyFromFullMessage(email);
+            }
+            
+            // Ajouter l'email avec les informations extraites
+            emails.push({
+              ...email,
+              from: { value: author },
+              to: { value: recipients.join(', ') },
+              body: body,
+            });
           }
         } else {
           await logWarn(`API messenger non disponible pour récupérer l'email ${emailId}`);
@@ -318,8 +342,8 @@ function formatConversationForLLM(emails) {
     });
 
     return `[Message ${index + 1} - ${date}]
-De : ${email.from?.value || 'Inconnu'}
-À : ${email.to?.value || 'Inconnu'}
+De : ${email.from?.value || email.author || 'Inconnu'}
+À : ${email.to?.value || email.recipients?.join(', ') || 'Inconnu'}
 Sujet : ${email.subject || 'Sans sujet'}
 Contenu : ${email.body || ''}
 `;

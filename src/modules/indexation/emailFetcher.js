@@ -189,7 +189,7 @@ export async function emailExists(messageId) {
  * @param {Object} fullMessage - Le message complet de getFull()
  * @returns {string} Le corps du message en texte brut
  */
-function extractBodyFromFullMessage(fullMessage) {
+export function extractBodyFromFullMessage(fullMessage) {
   if (!fullMessage || !fullMessage.parts) {
     return '';
   }
@@ -220,7 +220,7 @@ function extractBodyFromFullMessage(fullMessage) {
  * @param {Object} messageHeader - Le MessageHeader de l'email
  * @returns {Object} Objet avec author et recipients
  */
-function extractAddressInfo(messageHeader) {
+export function extractAddressInfo(messageHeader) {
   // L'auteur est disponible directement dans MessageHeader
   const author = messageHeader.author || '';
   

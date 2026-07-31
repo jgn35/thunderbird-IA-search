@@ -18,6 +18,11 @@ import {
   checkEmailIndexed,
   checkEmbeddingConfig,
 } from './modules/indexation/indexer.js';
+import {
+  getInlineTextParts,
+  extractBodyFromFullMessage,
+  extractAddressInfo,
+} from './modules/indexation/emailFetcher.js';
 
 /**
  * Obtient l'API messenger disponible
@@ -342,15 +347,30 @@ async function handleMessageCreated(message) {
       const fullEmail = await messengerAPI.messages.getFull(message.id);
       
       if (fullEmail) {
+        // Extraire les informations d'adresse
+        const { author, recipients } = extractAddressInfo(fullEmail);
+        
+        // Extraire le corps du message
+        let body = '';
+        if (fullEmail) {
+          const inlineParts = await getInlineTextParts(message.id);
+          if (inlineParts && inlineParts.length > 0) {
+            const textPart = inlineParts.find(p => p.contentType === 'text/plain') || inlineParts[0];
+            body = textPart.content || '';
+          } else {
+            body = extractBodyFromFullMessage(fullEmail);
+          }
+        }
+        
         // Indexer le nouvel email
         await indexEmail({
           id: fullEmail.id,
           folderId: fullEmail.folderId,
           folderName: '', // À récupérer
           subject: fullEmail.subject || '',
-          body: fullEmail.body || '',
-          from: fullEmail.from?.value || '',
-          to: fullEmail.to?.value || '',
+          body: body,
+          from: author,
+          to: recipients.join(', '),
           date: fullEmail.date ? new Date(fullEmail.date).getTime() : null,
           lastModified: fullEmail.lastModified ? new Date(fullEmail.lastModified).getTime() : null,
         });
@@ -384,15 +404,30 @@ async function handleMessageModified(message) {
       const fullEmail = await messengerAPI.messages.getFull(message.id);
       
       if (fullEmail) {
+        // Extraire les informations d'adresse
+        const { author, recipients } = extractAddressInfo(fullEmail);
+        
+        // Extraire le corps du message
+        let body = '';
+        if (fullEmail) {
+          const inlineParts = await getInlineTextParts(message.id);
+          if (inlineParts && inlineParts.length > 0) {
+            const textPart = inlineParts.find(p => p.contentType === 'text/plain') || inlineParts[0];
+            body = textPart.content || '';
+          } else {
+            body = extractBodyFromFullMessage(fullEmail);
+          }
+        }
+        
         // Réindexer l'email modifié
         await indexEmail({
           id: fullEmail.id,
           folderId: fullEmail.folderId,
           folderName: '', // À récupérer
           subject: fullEmail.subject || '',
-          body: fullEmail.body || '',
-          from: fullEmail.from?.value || '',
-          to: fullEmail.to?.value || '',
+          body: body,
+          from: author,
+          to: recipients.join(', '),
           date: fullEmail.date ? new Date(fullEmail.date).getTime() : null,
           lastModified: fullEmail.lastModified ? new Date(fullEmail.lastModified).getTime() : null,
         });
@@ -450,14 +485,29 @@ async function handleMessagesMoved(messageIds, sourceFolderId, destinationFolder
         // L'email est déplacé vers un dossier indexé : l'indexer
         const fullEmail = await messengerAPI.messages.getFull(messageId);
         if (fullEmail) {
+          // Extraire les informations d'adresse
+          const { author, recipients } = extractAddressInfo(fullEmail);
+          
+          // Extraire le corps du message
+          let body = '';
+          if (fullEmail) {
+            const inlineParts = await getInlineTextParts(messageId);
+            if (inlineParts && inlineParts.length > 0) {
+              const textPart = inlineParts.find(p => p.contentType === 'text/plain') || inlineParts[0];
+              body = textPart.content || '';
+            } else {
+              body = extractBodyFromFullMessage(fullEmail);
+            }
+          }
+          
           await indexEmail({
             id: fullEmail.id,
             folderId: destinationFolderId,
             folderName: '', // À récupérer
             subject: fullEmail.subject || '',
-            body: fullEmail.body || '',
-            from: fullEmail.from?.value || '',
-            to: fullEmail.to?.value || '',
+            body: body,
+            from: author,
+            to: recipients.join(', '),
             date: fullEmail.date ? new Date(fullEmail.date).getTime() : null,
             lastModified: fullEmail.lastModified ? new Date(fullEmail.lastModified).getTime() : null,
           });
