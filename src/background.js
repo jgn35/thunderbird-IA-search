@@ -364,7 +364,7 @@ async function handleMessageCreated(message) {
         
         // Indexer le nouvel email
         await indexEmail({
-          id: fullEmail.id,
+          id: message.id,
           folderId: fullEmail.folderId,
           folderName: '', // À récupérer
           subject: fullEmail.subject || '',
@@ -421,7 +421,7 @@ async function handleMessageModified(message) {
         
         // Réindexer l'email modifié
         await indexEmail({
-          id: fullEmail.id,
+          id: message.id,
           folderId: fullEmail.folderId,
           folderName: '', // À récupérer
           subject: fullEmail.subject || '',
@@ -501,7 +501,7 @@ async function handleMessagesMoved(messageIds, sourceFolderId, destinationFolder
           }
           
           await indexEmail({
-            id: fullEmail.id,
+            id: messageId,
             folderId: destinationFolderId,
             folderName: '', // À récupérer
             subject: fullEmail.subject || '',
