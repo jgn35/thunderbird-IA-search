@@ -269,6 +269,51 @@ async function handleMessage(message, sender, sendResponse) {
         sendResponse({ success: true });
         break;
         
+      case 'OPEN_EMAIL':
+        await logInfo(`Ouverture de l'email : ${message.emailId}`);
+        try {
+          const messengerAPI = getMessengerAPI();
+          if (messengerAPI && messengerAPI.messages) {
+            // Essayer de créer un nouvel onglet avec l'URL du message
+            if (typeof browser !== 'undefined' && browser.tabs && browser.tabs.create) {
+              try {
+                // Essayer avec l'URL messenger:message:{id}
+                await browser.tabs.create({
+                  url: `messenger:message:${message.emailId}`
+                });
+                sendResponse({ success: true });
+                return;
+              } catch (e) {
+                // Si ça échoue, essayer avec mailbox://
+                try {
+                  await browser.tabs.create({
+                    url: `mailbox://?id=${message.emailId}`
+                  });
+                  sendResponse({ success: true });
+                  return;
+                } catch (e2) {
+                  // Si les deux échouent, retourner une erreur
+                  sendResponse({ 
+                    success: false, 
+                    error: 'Impossible de ouvrir email: API non disponible' 
+                  });
+                }
+              }
+            } else {
+              sendResponse({ 
+                success: false, 
+                error: 'API non disponible' 
+              });
+            }
+          } else {
+            sendResponse({ success: false, error: 'API messenger non disponible' });
+          }
+        } catch (error) {
+          await logError(error, 'Ouverture email');
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+        
       case 'FOCUS_SEARCH':
         await logInfo('Focus sur la recherche demandé');
         sendResponse({ success: true });

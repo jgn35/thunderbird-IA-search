@@ -386,6 +386,9 @@ async function performSearch() {
         const answerDurationElement = document.getElementById('answerDuration');
         if (answerDurationElement) {
           answerDurationElement.textContent = `Temps: ${ragResult.duration}ms`;
+        
+        // Afficher les emails du contexte
+        displayRAGContext(ragResult.context);
         }
       } else {
         showNotification(ragResult.error || 'Erreur lors du RAG', 'error');
@@ -396,6 +399,11 @@ async function performSearch() {
         
         if (ragAnswerSection) {
           ragAnswerSection.style.display = 'none';
+        }
+        // Masquer la section de contexte
+        const ragContextSection2 = document.getElementById('ragContextSection');
+        if (ragContextSection2) {
+          ragContextSection2.style.display = 'none';
         }
       }
     } else {
@@ -912,6 +920,88 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+
+
+/**
+ * Affiche les emails du contexte RAG
+ * @param {Array} context - Liste des emails du contexte
+ */
+function displayRAGContext(context) {
+  const ragContextSection = document.getElementById('ragContextSection');
+  const ragContextEmails = document.getElementById('ragContextEmails');
+  
+  if (!ragContextSection || !ragContextEmails) return;
+  
+  if (!context || context.length === 0) {
+    ragContextSection.style.display = 'none';
+    return;
+  }
+  
+  // Afficher la section
+  ragContextSection.style.display = 'block';
+  
+  let html = '';
+  for (const email of context) {
+    const date = new Date(email.date).toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    
+    const snippet = email.body.substring(0, 150) + (email.body.length > 150 ? '...' : '');
+    
+    html += `
+      <div class="context-email" data-email-id="${email.emailId}">
+        <div class="email-subject">${escapeHtml(email.subject || 'Sans sujet')}</div>
+        <div class="email-meta">
+          <span>${escapeHtml(email.from)}</span>
+          <span>${date}</span>
+          <span>${escapeHtml(email.folderName || '')}</span>
+        </div>
+        <div class="email-snippet">${escapeHtml(snippet)}</div>
+      </div>
+    `;
+  }
+  
+  ragContextEmails.innerHTML = html;
+  
+  // Ajouter les gestionnaires de clic
+  ragContextEmails.querySelectorAll('.context-email').forEach(emailElement => {
+    emailElement.addEventListener('click', () => {
+      const emailId = emailElement.dataset.emailId;
+      openEmail(emailId);
+    });
+  });
+}
+
+/**
+ * Ouvre un email dans Thunderbird
+ * @param {string} emailId - ID de l'email à ouvrir
+ */
+async function openEmail(emailId) {
+  try {
+    showLoading('Ouverture de l\'email...');
+    
+    // Envoyer un message au background script pour ouvrir l'email
+    const result = await browser.runtime.sendMessage({ 
+      type: 'OPEN_EMAIL', 
+      emailId: emailId 
+    });
+    
+    if (result && result.success) {
+      hideLoading();
+    } else {
+      hideLoading();
+      showNotification(result?.error || 'Erreur lors de l\'ouverture de l\'email', 'error');
+    }
+  } catch (error) {
+    hideLoading();
+    console.error('Erreur lors de l\'ouverture de l\'email:', error);
+    showNotification('Erreur lors de l\'ouverture de l\'email', 'error');
+  }
+}
+
 
 // Initialiser l'application lorsque le DOM est chargé
 document.addEventListener('DOMContentLoaded', init);

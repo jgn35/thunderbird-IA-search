@@ -322,6 +322,60 @@
   margin-top: 4px;
 }
 
+/* Section du contexte RAG */
+.rag-context-section {
+  margin-bottom: var(--margin);
+}
+
+.rag-context-section h3 {
+  margin: 0 0 var(--margin) 0;
+  font-size: 14px;
+  color: var(--text-color);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+}
+
+#ragContextEmails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--margin);
+}
+
+.context-email {
+  padding: var(--padding);
+  background-color: var(--background-color);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--success-color);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.context-email:hover {
+  background-color: var(--border-color);
+  border-left-color: var(--primary-color);
+}
+
+.context-email .email-subject {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--primary-color);
+}
+
+.context-email .email-meta {
+  display: flex;
+  gap: var(--margin);
+  font-size: 11px;
+  color: var(--secondary-color);
+  margin-bottom: 4px;
+}
+
+.context-email .email-snippet {
+  font-size: 12px;
+  color: var(--text-color);
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
 /* Configuration */
 .config-section {
   margin-bottom: var(--margin);
